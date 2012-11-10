@@ -1,0 +1,14 @@
+func f = int(int x ) {
+  x = x + 2;
+ 
+  func add = int(int y) {
+    return y + x;
+  }
+  return add(x);
+}
+
+func main = int() {
+  int l=f(8);
+  int x = l + l + l;
+}
+

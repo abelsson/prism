@@ -1,0 +1,5 @@
+func main = int() {
+  int i = "foo";
+  int x = 4 + i * 8;
+}
+

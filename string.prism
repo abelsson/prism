@@ -1,0 +1,5 @@
+func main = int() {
+   string foo = "foo";
+
+   put(foo);
+}

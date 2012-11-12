@@ -38,24 +38,23 @@ void CodeGenContext::runCode()
 
 /* -- Code Generation -- */
 
-Value* NInteger::codeGen(CodeGenContext& context)
+void Integer::codeGen(CodeGenContext& context)
 {
-    std::cout << "Creating integer: " << value << endl;
-    context.vpush(value);
-    return 0;
+    std::cout << "Creating integer: " << m_value << endl;
+    context.vpush(m_value);
 }
 
-Value* NDouble::codeGen(CodeGenContext& context)
+void Double::codeGen(CodeGenContext& context)
 {
     std::cout << "Creating double: " << value << endl;
 }
 
 
-Value *NString::codeGen(CodeGenContext &context)
+void String::codeGen(CodeGenContext &context)
 {
 }
 
-Value* NIdentifier::codeGen(CodeGenContext& context)
+void Identifier::codeGen(CodeGenContext& context)
 {
     std::cout << "Creating identifier reference: " << name << endl;
 
@@ -65,22 +64,21 @@ Value* NIdentifier::codeGen(CodeGenContext& context)
         exit(0);
     }
     context.vpushm(v->addr);
-    return 0;
 }
 
-Value* NMethodCall::codeGen(CodeGenContext& context)
+void MethodCall::codeGen(CodeGenContext& context)
 {
-    std::cout << "Calling function " << id.name << std::endl;
+    std::cout << "Calling function " << id->name << std::endl;
 
-    Function *f = context.find_function(id.name);
+    Function *f = context.find_function(id->name);
     if (!f) {
-        std::cout << "Error, no matching call to function " << id.name << std::endl;
+        std::cout << "Error, no matching call to function " << id->name << std::endl;
         exit(0);
     }
 
     ExpressionList::const_iterator it;
     int i = 0;
-    for (it = arguments.begin(); it != arguments.end(); it++) {
+    for (it = arguments->begin(); it != arguments->end(); it++) {
         (**it).codeGen(context);
         context.vpop(f->arguments[i++]);
     }
@@ -88,12 +86,12 @@ Value* NMethodCall::codeGen(CodeGenContext& context)
     context.vcall(idx);
 }
 
-Value* BinaryOperator::codeGen(CodeGenContext& context)
+void BinaryOperator::codeGen(CodeGenContext& context)
 {
     std::cout << "Creating binary operation " << endl;
 
-    lhs.codeGen(context);
-    rhs.codeGen(context);
+    lhs->codeGen(context);
+    rhs->codeGen(context);
 
     switch (op) {
         case TPLUS:
@@ -109,74 +107,67 @@ Value* BinaryOperator::codeGen(CodeGenContext& context)
         break;
         /* TODO comparison */
     }
-    return 0;
 
 }
 
-Value* Assignment::codeGen(CodeGenContext& context)
+void Assignment::codeGen(CodeGenContext& context)
 {
-    std::cout << "Creating assignment for " << lhs.name << endl;
-    if (context.locals().find(lhs.name) == context.locals().end()) {
-        std::cerr << "undeclared variable " << lhs.name << endl;
-        return NULL;
+    std::cout << "Creating assignment for " << lhs->name << endl;
+    if (context.locals().find(lhs->name) == context.locals().end()) {
+        std::cerr << "undeclared variable " << lhs->name << endl;
+        return;
     }
 
-    rhs.codeGen(context);
-    context.vpop(context.locals()[lhs.name]->addr);
-    return context.locals()[lhs.name];
+    rhs->codeGen(context);
+    context.vpop(context.locals()[lhs->name]->addr);
 }
 
 
-Value* Block::codeGen(CodeGenContext& context, int local_funcs_only)
+void Block::codeGen(CodeGenContext& context, int local_funcs_only)
 {
     StatementList::const_iterator it;
-    Value *last = NULL;
     for (it = statements.begin(); it != statements.end(); it++) {
         if (local_funcs_only && typeid(**it) == typeid(FunctionDeclaration)) {
-            std::cout << "Generating code for " << typeid(**it).name() << endl;
-            last = (**it).codeGen(context);
+            std::cout << "Generating code func for " << typeid(**it).name() << endl;
+            (**it).codeGen(context);
         }
         if (!local_funcs_only && typeid(**it) != typeid(FunctionDeclaration)) {
             std::cout << "Generating code for " << typeid(**it).name() << endl;
-            last = (**it).codeGen(context);
+            (**it).codeGen(context);
         }
     }
 
     std::cout << "Creating block" << endl;
-    return last;
 }
 
-Value* ExpressionStatement::codeGen(CodeGenContext& context)
+void ExpressionStatement::codeGen(CodeGenContext& context)
 {
     std::cout << "Generating code for " << typeid(expression).name() << endl;
     return expression.codeGen(context);
 }
 
-Value* VariableDeclaration::codeGen(CodeGenContext& context)
+void VariableDeclaration::codeGen(CodeGenContext& context)
 {
-    std::cout << "Creating variable declaration " << type.name << " " << id.name << endl;
+    std::cout << "Creating variable declaration " << type->name << " " << id->name << endl;
 
-    Value *v = new Value(addr++);
-    context.locals()[id.name] = v;
+    context.locals()[id->name] = value();
     if (assignmentExpr != NULL) {
-        Assignment assn(id, *assignmentExpr);
+        Assignment assn(id, assignmentExpr);
         assn.codeGen(context);
     }
-    return v;
 }
 
-Value* ExternDeclaration::codeGen(CodeGenContext& context)
+void ExternDeclaration::codeGen(CodeGenContext& context)
 {
     VariableList::const_iterator it;
-    for (it = arguments.begin(); it != arguments.end(); it++) {
-       cout << (**it).type.name << endl;
+    for (it = arguments->begin(); it != arguments->end(); it++) {
+       cout << (**it).type->name << endl;
     }
 
-    std::cout << "Creating external function: " << id.name << endl;
-    return 0;
+    std::cout << "Creating external function: " << id->name << endl;
 }
 
-Value* FunctionDeclaration::codeGen(CodeGenContext& context)
+void FunctionDeclaration::codeGen(CodeGenContext& context)
 {
     BasicBlock *bblock = new BasicBlock();
 
@@ -184,32 +175,30 @@ Value* FunctionDeclaration::codeGen(CodeGenContext& context)
 
     context.pushBlock(bblock);
     VariableList::const_iterator it;
-    for (it = arguments.begin(); it != arguments.end(); it++) {
-        cout << "Argument : " << (**it).type.name ;
-        Value *v = (**it).codeGen(context);
+    for (it = arguments->begin(); it != arguments->end(); it++) {
+        cout << "Argument : " << (**it).type->name ;
+        Value *v = (*it)->value();
+        (**it).codeGen(context);
         cout << " at: " << v->addr << endl;
         f->arguments.push_back(v->addr);
     }
-    block.codeGen(context, true);
+    block->codeGen(context, true);
     f->pm_addr = context.getCurrent();
-    block.codeGen(context, false);
+    block->codeGen(context, false);
     context.vret();
     context.popBlock();
 
-    context.functions().insert(std::make_pair(id.name, f));
+    context.functions().insert(std::make_pair(id->name, f));
 
-    std::cout << "Creating function: " << id.name << endl;
-
-    return 0;
+    std::cout << "Creating function: " << id->name << endl;
 }
 
-Value* IfStatement::codeGen(CodeGenContext& context)
+void IfStatement::codeGen(CodeGenContext& context)
 {
-   return 0;
 }
 
 
-Value *ReturnStatement::codeGen(CodeGenContext &context)
+void ReturnStatement::codeGen(CodeGenContext &context)
 {
     expr->codeGen(context);
 }

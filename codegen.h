@@ -14,6 +14,28 @@ public:
     int addr;
 };
 
+class ConstantValue : public Value
+{
+public:
+    ConstantValue(int value): Value(-1)
+    {
+        m_value.integer = value;
+    }
+
+    union {
+        const char *str;
+        int integer;
+        double dbl;
+    } m_value;
+};
+
+class Type
+{
+public:
+    Type(int id): id(id) {}
+    int id;
+};
+
 class BasicBlock
 {
 

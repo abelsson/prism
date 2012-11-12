@@ -4,172 +4,187 @@
 #include "codegen.h"
 
 class CodeGenContext;
-class NStatement;
+class Statement;
 class Expression;
 class VariableDeclaration;
 
-typedef std::vector<NStatement*> StatementList;
+typedef std::vector<Statement*> StatementList;
 typedef std::vector<Expression*> ExpressionList;
 typedef std::vector<VariableDeclaration*> VariableList;
 
+extern int addr;
 
 class Node {
 public:
     virtual ~Node() {}
-    virtual Value* codeGen(CodeGenContext& context) { }
+    virtual Value *value() { return NULL; }
+    virtual Type *type() { return NULL; }
+    virtual void codeGen(CodeGenContext& context) { }
 };
-
 
 class Expression : public Node {
 };
 
-class NStatement : public Node {
+class Statement : public Node {
 };
 
-class NInteger : public Expression {
+class Integer : public Expression {
 public:
-    long long value;
-    NInteger(long long value) : value(value) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    long long m_value;
+
+    Value *value() { return new Value(m_value); }
+    Integer(long long value) : m_value(value) { }
+    void codeGen(CodeGenContext& context);
 };
 
-class NDouble : public Expression {
+class Double : public Expression {
 public:
     double value;
-    NDouble(double value) : value(value) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    Double(double value) : value(value) { }
+    void codeGen(CodeGenContext& context);
 };
 
-class NString : public Expression {
+class String : public Expression {
 public:
     std::string value;
-    NString(const std::string* value) : value(*value) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    String(const std::string* value) : value(*value) { }
+    void codeGen(CodeGenContext& context);
 };
 
-class NIdentifier : public Expression {
+class Identifier : public Expression {
 public:
     std::string name;
-    NIdentifier(const std::string& name) : name(name) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    Identifier(const std::string& name) : name(name) { }
+    void codeGen(CodeGenContext& context);
 };
 
-class NMethodCall : public Expression {
+class MethodCall : public Expression {
 public:
-    const NIdentifier& id;
-    ExpressionList arguments;
-    NMethodCall(const NIdentifier& id, ExpressionList& arguments) :
+    const Identifier* id;
+
+    ExpressionList* arguments;
+
+    MethodCall(const Identifier* id, ExpressionList* arguments) :
         id(id), arguments(arguments) { }
-    NMethodCall(const NIdentifier& id) : id(id) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    MethodCall(const Identifier* id) : id(id) { }
+    void codeGen(CodeGenContext& context);
 };
 
 class BinaryOperator : public Expression {
 public:
     int op;
-    Expression& lhs;
-    Expression& rhs;
-    BinaryOperator(Expression& lhs, int op, Expression& rhs) :
-        lhs(lhs), rhs(rhs), op(op) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    Expression* lhs;
+    Expression* rhs;
+
+    BinaryOperator(Expression* lhs, int op, Expression* rhs) :
+        lhs(lhs), rhs(rhs), op(op)
+    {
+    }
+    void codeGen(CodeGenContext& context);
 };
 
 class Assignment : public Expression {
 public:
-    NIdentifier& lhs;
-    Expression& rhs;
-    Assignment(NIdentifier& lhs, Expression& rhs) :
+    Identifier* lhs;
+    Expression* rhs;
+    Assignment(Identifier* lhs, Expression* rhs) :
         lhs(lhs), rhs(rhs) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    void codeGen(CodeGenContext& context);
 };
 
 class Block : public Expression {
 public:
     StatementList statements;
     Block() { }
-    virtual Value* codeGen(CodeGenContext& context, int local_funcs_only);
+    void codeGen(CodeGenContext& context, int local_funcs_only);
 };
 
-class ExpressionStatement : public NStatement {
+class ExpressionStatement : public Statement {
 public:
     Expression& expression;
     ExpressionStatement(Expression& expression) :
         expression(expression) { }
-    virtual Value* codeGen(CodeGenContext& context);
+    void codeGen(CodeGenContext& context);
 };
 
-class VariableDeclaration : public NStatement {
+class VariableDeclaration : public Statement {
 public:
-    const NIdentifier& type;
-    NIdentifier& id;
-    Expression *assignmentExpr;
-
-    VariableDeclaration(const NIdentifier& type, NIdentifier& id) :
-        type(type), id(id)
+    const Identifier* type;
+    Identifier* id;
+    Expression* assignmentExpr;
+    Value *v;
+    VariableDeclaration(const Identifier* type, Identifier* id) :
+        type(type), id(id), v(0)
     {
     }
 
-    VariableDeclaration(const NIdentifier& type, NIdentifier& id, Expression *assignmentExpr) :
-        type(type), id(id), assignmentExpr(assignmentExpr)
+    VariableDeclaration(const Identifier* type, Identifier* id, Expression *assignmentExpr) :
+        type(type), id(id), assignmentExpr(assignmentExpr), v(0)
     {
 
     }
 
-    virtual Value* codeGen(CodeGenContext& context);
+    Value *value()
+    {
+        if (v == NULL)
+            v = new Value(addr++);
+        return v;
+    }
+    void codeGen(CodeGenContext& context);
 };
 
-class FunctionDeclaration : public NStatement {
+class FunctionDeclaration : public Statement {
 public:
-    const NIdentifier& type;
-    const NIdentifier& id;
-    VariableList arguments;
-    Block& block;
-    FunctionDeclaration(const NIdentifier& type,
-                        const NIdentifier& id,
-                        const VariableList& arguments,
-                        Block& block) :
+    const Identifier* type;
+    const Identifier* id;
+    const VariableList* arguments;
+    Block* block;
+    FunctionDeclaration(const Identifier* type,
+                        const Identifier* id,
+                        const VariableList* arguments,
+                        Block* block) :
         type(type), id(id), arguments(arguments), block(block)
     {
 
     }
 
-    virtual Value* codeGen(CodeGenContext& context);
+    void codeGen(CodeGenContext& context);
 };
 
-class ExternDeclaration : public NStatement
+class ExternDeclaration : public Statement
 {
 public:
-    const NIdentifier& type;
-    const NIdentifier& id;
-    VariableList arguments;
+    const Identifier* type;
+    const Identifier* id;
+    const VariableList* arguments;
 
-    ExternDeclaration(const NIdentifier& type, const NIdentifier& id, const VariableList& arguments) :
+    ExternDeclaration(const Identifier* type, const Identifier* id, const VariableList* arguments) :
         type(type), id(id), arguments(arguments)
     {
 
     }
 
-    virtual Value* codeGen(CodeGenContext& context);
+    void codeGen(CodeGenContext& context);
 };
 
 
-class IfStatement : public NStatement
+class IfStatement : public Statement
 {
 public:
     Expression *evalExpr;
-    Block& thenBlock;
-    Block& elseBlock;
+    Block* thenBlock;
+    Block* elseBlock;
 
-    IfStatement(Expression *evalExpr, Block& elseBlock, Block &thenBlock) :
+    IfStatement(Expression *evalExpr, Block* elseBlock, Block *thenBlock) :
         evalExpr(evalExpr), thenBlock(thenBlock), elseBlock(elseBlock)
     {
 
     }
 
-    virtual Value* codeGen(CodeGenContext& context);
+    void codeGen(CodeGenContext& context);
 };
 
-class ReturnStatement : public NStatement
+class ReturnStatement : public Statement
 {
 public:
     ReturnStatement(Expression *expr):
@@ -178,7 +193,7 @@ public:
 
     }
 
-    virtual Value* codeGen(CodeGenContext &context);
+    void codeGen(CodeGenContext &context);
 private:
     Expression *expr;
 };

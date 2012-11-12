@@ -20,8 +20,8 @@
     Node *node;
     Block *block;
     Expression *expr;
-    NStatement *stmt;
-    NIdentifier *ident;
+    Statement *stmt;
+    Identifier *ident;
     VariableDeclaration *var_decl;
     std::vector<VariableDeclaration*> *varvec;
     std::vector<Expression*> *exprvec;
@@ -79,20 +79,20 @@ block : TLBRACE stmts TRBRACE { $$ = $2; }
       | TLBRACE TRBRACE { $$ = new Block(); }
       ;
 
-var_decl : ident ident { $$ = new VariableDeclaration(*$1, *$2); }
-         | ident ident TEQUAL expr { $$ = new VariableDeclaration(*$1, *$2, $4); }
+var_decl : ident ident { $$ = new VariableDeclaration($1, $2); }
+         | ident ident TEQUAL expr { $$ = new VariableDeclaration($1, $2, $4); }
          ;
 
-if_stmt: TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3, *$5, *$7); }
+if_stmt: TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3, $5, $7); }
          ;
 
 return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }
          ;
-extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration(*$2, *$3, *$5); delete $5; }
+extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration($2, $3, $5); }
          ;
 
 func_decl : TFUNC ident TEQUAL ident TLPAREN func_decl_args TRPAREN block
-            { $$ = new FunctionDeclaration(*$4, *$2, *$6, *$8); delete $6; }
+            { $$ = new FunctionDeclaration($4, $2, $6, $8); }
           ;
 
 func_decl_args : /*blank*/  { $$ = new VariableList(); }
@@ -100,22 +100,22 @@ func_decl_args : /*blank*/  { $$ = new VariableList(); }
           | func_decl_args TCOMMA var_decl { $1->push_back($<var_decl>3); }
           ;
 
-ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
+ident : TIDENTIFIER { $$ = new Identifier(*$1); delete $1; }
       ;
 
-numeric : TINTEGER { $$ = new NInteger(atol($1->c_str())); delete $1; }
-        | TDOUBLE { $$ = new NDouble(atof($1->c_str())); delete $1; }
+numeric : TINTEGER { $$ = new Integer(atol($1->c_str())); delete $1; }
+        | TDOUBLE { $$ = new Double(atof($1->c_str())); delete $1; }
         ;
 
-string : TSTRING { $$ = new NString($1); delete $1; }
+string : TSTRING { $$ = new String($1); delete $1; }
        ;
 
-expr : ident TEQUAL expr { $$ = new Assignment(*$<ident>1, *$3); }
-     | ident TLPAREN call_args TRPAREN { $$ = new NMethodCall(*$1, *$3); delete $3; }
+expr : ident TEQUAL expr { $$ = new Assignment($<ident>1, $3); }
+     | ident TLPAREN call_args TRPAREN { $$ = new MethodCall($1, $3);  }
      | ident { $<ident>$ = $1; }
      | numeric
      | string
-     | expr comparison expr { $$ = new BinaryOperator(*$1, $2, *$3); }
+     | expr comparison expr { $$ = new BinaryOperator($1, $2, $3); }
      | TLPAREN expr TRPAREN { $$ = $2; }
      ;
 

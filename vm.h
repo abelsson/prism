@@ -38,9 +38,9 @@ public:
         A, B
     };
     enum Code {
-        LD, LDI, ST, ADD, MUL, ADDI, SUB, SUBI, PUT, JNZ,
+        LD, LDI, ST, ADD, MUL, CMP, SUB, SUBI, PUT, JNZ,
         PUSHI, PUSH, PUSHM, POP, POPM,
-        CALL, RET,
+        CALL, RET, ASSERT, JE, JNE, JMP,
         END_OF_CODE
     };
     ToyVm()
@@ -57,16 +57,6 @@ public:
     void vpushm(uint16 idx)
     {
         encode(PUSHM, A, idx);
-    }
-
-    void vpush(Reg r)
-    {
-        encode(PUSH, r);
-    }
-
-    void vpop(Reg r)
-    {
-        encode(POP, r);
     }
 
     void vcall(uint16 idx)
@@ -93,30 +83,52 @@ public:
     {
         encode(LD, r, idx);
     }
+
     void vst(Reg r, uint16 idx) {
         encode(ST, r, idx);
     }
+
     void vadd() {
         encode(ADD);
     }
+
     void vmul() {
         encode(MUL);
     }
-    void vaddi(Reg r, uint16 imm) {
-        encode(ADDI, r, imm);
+
+    void vassert() {
+        encode(ASSERT);
     }
-    void vsub(Reg r, uint16 idx) {
-        encode(SUB, r, idx);
-    }
-    void vsubi(Reg r, uint16 imm) {
-        encode(SUBI, r, imm);
-    }
+
     void vjnz(Reg r, int offset) {
         encode(JNZ, r, static_cast<uint16>(offset));
     }
+
     void vput(Reg r) {
         encode(PUT, r);
     }
+
+    void vje(uint16 imm) {
+        encode(JE, A, imm);
+    }
+
+    void vjne(uint16 imm) {
+        encode(JNE, A, imm);
+    }
+
+    void vjmp(uint16 imm) {
+        encode(JMP, A, imm);
+    }
+
+    void set_label(const std::string& id) {
+        m_labels.insert(std::make_pair(id, getCurrent()));
+    }
+
+    int reserve() {
+        m_code.push_back(0);
+        return m_code.size()-1;
+    }
+
     void setMark();
     int getMarkOffset();
     int getCurrent();
@@ -148,6 +160,19 @@ public:
         printf("]\n");
     }
 
+    void encode(Code code, Reg r = A, uint16 imm = 0)
+    {
+        uint32 x = (code << 24) | (r << 16) | imm;
+        m_code.push_back(x);
+    }
+
+    void encode_at(int idx, Code code, Reg r = A, uint16 imm = 0)
+    {
+        uint32 x = (code << 24) | (r << 16) | imm;
+        m_code[idx] = x;
+    }
+
+    void print_code(int code, int imm);
 private:
 
     uint32 m_mem[65536];
@@ -155,6 +180,7 @@ private:
     Buffer m_code;
     int m_sp;
     int m_mark;
+    std::map<std::string, int> m_labels;
 
     void decode(uint32& code, uint32& r, uint32& imm, uint32 x)
     {
@@ -162,10 +188,5 @@ private:
         r = (x >> 16) & 0xff;
         imm = x & 0xffff;
 
-    }
-    void encode(Code code, Reg r = A, uint16 imm = 0)
-    {
-        uint32 x = (code << 24) | (r << 16) | imm;
-        m_code.push_back(x);
     }
 };

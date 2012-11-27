@@ -37,7 +37,7 @@
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON
 %token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TEXTERN TIF TELSE TRETURN TFUNC
+%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -49,7 +49,7 @@
 %type <varvec> func_decl_args
 %type <exprvec> call_args
 %type <block> program stmts block
-%type <stmt> stmt var_decl func_decl extern_func_decl if_stmt return_stmt
+%type <stmt> stmt var_decl func_decl extern_func_decl if_stmt return_stmt assert_stmt
 %type <token> comparison
 /* Operator precedence for mathematical operators */
 %left TPLUS TMINUS
@@ -72,6 +72,7 @@ stmt : var_decl TSEMICOLON
      | extern_func_decl
      | if_stmt
      | return_stmt TSEMICOLON
+     | assert_stmt TSEMICOLON
      | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
      ;
 
@@ -83,7 +84,11 @@ var_decl : ident ident { $$ = new VariableDeclaration($1, $2); }
          | ident ident TEQUAL expr { $$ = new VariableDeclaration($1, $2, $4); }
          ;
 
-if_stmt: TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3, $5, $7); }
+if_stmt  : TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3, $5, $7); }
+         | TIF TLPAREN expr TRPAREN block  { $$ = new IfStatement($3, $5, 0); }
+         ;
+
+assert_stmt: TASSERT expr { $$ = new AssertStatement($2); }
          ;
 
 return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }

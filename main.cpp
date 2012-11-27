@@ -27,9 +27,11 @@ int main(int argc, char **argv)
 
     if (error_count == 0) {
         std::cout << programBlock << std::endl;
-
         CodeGenContext context;
         context.generateCode(*programBlock);
+
+        programBlock->print(0);
+
         context.runCode();
     }
 

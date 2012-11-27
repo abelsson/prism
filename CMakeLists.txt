@@ -54,5 +54,5 @@ SET_SOURCE_FILES_PROPERTIES(${PROJECT_BINARY_DIR}/tokens.cpp GENERATED)
 # Include binary directory to include lexer.c in parser.c
  INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/src)
 
-
+add_subdirectory(yaml-cpp)
 add_executable (parser ${SOURCES})

@@ -36,8 +36,6 @@ void CodeGenContext::runCode()
 
 }
 
-/* -- Code Generation -- */
-
 void Integer::codeGen(CodeGenContext& context)
 {
     std::cout << "Creating integer: " << m_value << endl;
@@ -94,16 +92,18 @@ void BinaryOperator::codeGen(CodeGenContext& context)
     rhs->codeGen(context);
 
     switch (op) {
-        case TPLUS:
-          context.vadd();
-          break;
-        case TMINUS:
-          break;
-        case TMUL:
-          context.vmul();
-          break;
-        case TDIV:
-          break;
+    case TPLUS:
+        context.vadd();
+        break;
+    case TMINUS:
+        break;
+    case TMUL:
+        context.vmul();
+        break;
+    case TDIV:
+        break;
+    case TCEQ:
+        context.encode(ToyVm::CMP);
         break;
         /* TODO comparison */
     }
@@ -195,10 +195,37 @@ void FunctionDeclaration::codeGen(CodeGenContext& context)
 
 void IfStatement::codeGen(CodeGenContext& context)
 {
+    int then_end;
+    evalExpr->codeGen(context);
+    int then_start = context.reserve();
+    thenBlock->codeGen(context, false);
+
+    if (elseBlock) {
+        then_end = context.reserve();
+        elseBlock->codeGen(context ,false);
+    }
+
+    int block_end = context.getCurrent();
+
+    if (elseBlock) {
+        context.encode_at(then_end, CodeGenContext::JMP, CodeGenContext::A, block_end);
+        context.encode_at(then_start, CodeGenContext::JNE, CodeGenContext::A, then_end);
+    } else {
+        context.encode_at(then_start, CodeGenContext::JNE, CodeGenContext::A, block_end);
+    }
 }
+
 
 
 void ReturnStatement::codeGen(CodeGenContext &context)
 {
     expr->codeGen(context);
 }
+
+
+void AssertStatement::codeGen(CodeGenContext &context)
+{
+    expr->codeGen(context);
+    context.vassert();
+}
+

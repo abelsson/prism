@@ -75,7 +75,7 @@ public:
         return blocks.front()->functions;
     }
 
-    Function *find_function(const std::string &name)
+    Function* find_function(const std::string &name)
     {
         std::deque<CodeGenBlock*>::iterator it;
         for(it = blocks.begin(); it != blocks.end(); ++it) {
@@ -85,7 +85,7 @@ public:
         return 0;
     }
 
-    Value *find_variable(const std::string &name)
+    Value* find_variable(const std::string &name)
     {
         std::deque<CodeGenBlock*>::iterator it;
         for(it = blocks.begin(); it != blocks.end(); ++it) {

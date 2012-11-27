@@ -65,26 +65,48 @@ void ToyVm::run(int start_pc)
             int b = m_mem[++sp];
             m_mem[sp--] = a * b;
             } break;
-
-        case ADDI:
-            reg[r] += imm;
+        case CMP: {
+            int a = m_mem[++sp];
+            int b = m_mem[++sp];
+            m_mem[sp--] = a == b;
+            }
+            break;
+        case JE:{
+            int val =  m_mem[++sp];
+            if (val == 1)
+                pc = imm;
+            }
+            break;
+        case JNE: {
+            int val =  m_mem[++sp];
+            if (val == 0)
+                pc = imm;
+            }
+            break;
+        case JMP:
+            pc = imm;
             break;
         case CALL:
             m_callstack[call_sp++] = pc;
             pc = imm - 1;
             break;
+
         case RET:
             if (call_sp == 0)
                 break;
             pc = m_callstack[--call_sp];
             break;
+        case ASSERT: {
+            int val =  m_mem[++sp];
+            printf("assert: %d != 0\n", val);
+            assert(val != 0);
+            } break;
         default:
             assert(0);
             break;
         }
         if (debug) {
             printf("---\n");
-            printf("A %08x B %08x\n", reg[0], reg[1]);
             printf("m_mem[] = ");
             for(int i=0;i<8;i++)
                 printf("%04x ", m_mem[i]);
@@ -92,7 +114,9 @@ void ToyVm::run(int start_pc)
             for(int i=sp+1;i<65536;i++)
                 printf("%x ", m_mem[i]);
 
-            printf("]\npc=%4d, code=%02x, r=%d, imm=%04x\n", pc, code, r, imm);
+            printf("]\npc= %d: ", pc);
+            print_code(code, imm);
+            printf("\n");
         }
         pc++;
         if (pc >= end) break;
@@ -106,47 +130,54 @@ void ToyVm::dump()
         uint32 x = m_code[i];
         uint32 code, r, imm;
         decode(code, r, imm, x);
-        switch (code) {
-        case LDI:
-            printf("ldi %d, r%d\n", imm, r);
-            break;
-        case LD:
-            printf("ld  [%d], r%d\n", imm, r);
-            break;
-        case PUSH:
-            printf("push r%d\n", r);
-            break;
-        case PUSHI:
-            printf("push %d\n", imm);
-            break;
-        case PUSHM:
-            printf("push [%d]\n", imm);
-            break;
-        case POP:
-            printf("pop r%d\n", r);
-            break;
-        case POPM:
-            printf("pop [%d]\n", imm);
-            break;
-        case ST:
-            printf("st  r%d, [%d]\n", r, imm);
-            break;
-        case CALL:
-            printf("call %d\n", imm);
-            break;
-        case RET:
-            printf("ret\n");
-            break;
-        case ADD:
-            printf("add\n");
-            break;
-        case MUL:
-            printf("mul\n");
-            break;
-        default:
-            assert(0);
-            break;
-        }
+        print_code(code, imm);
+        printf("\n");
+    }
+}
+
+void ToyVm::print_code(int code, int imm)
+{
+    switch (code) {
+    case PUSHI:
+        printf("push %d", imm);
+        break;
+    case PUSHM:
+        printf("push [%d]", imm);
+        break;
+    case POPM:
+        printf("pop [%d]", imm);
+        break;
+    case CALL:
+        printf("call %d", imm);
+        break;
+    case RET:
+        printf("ret");
+        break;
+    case ADD:
+        printf("add");
+        break;
+    case MUL:
+        printf("mul");
+        break;
+    case CMP:
+        printf("cmp");
+        break;
+    case ASSERT:
+        printf("assert");
+        break;
+    case JE:
+        printf("je %d", imm);
+        break;
+    case JNE:
+        printf("jne %d", imm);
+        break;
+    case JMP:
+        printf("jmp %d", imm);
+        break;
+    default:
+        printf("Unknown code %d\n", code);
+        assert(0);
+        break;
     }
 }
 

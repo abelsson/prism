@@ -39,6 +39,7 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 "else"                  return TOKEN(TELSE);
 "return"                return TOKEN(TRETURN);
 "func"                  return TOKEN(TFUNC);
+"assert"                return TOKEN(TASSERT);
 [a-zA-Z_][a-zA-Z0-9_]*  SAVE_TOKEN; return TIDENTIFIER;
 .                       printf("Unknown token!\n"); yyterminate();
 

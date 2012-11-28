@@ -1,6 +1,8 @@
 #include <iostream>
 #include "vm.h"
 
+extern int debug;
+
 void ToyVm::setMark()
 {
     m_mark = (int)m_code.size();
@@ -13,13 +15,11 @@ int ToyVm::getMarkOffset()
 
 int ToyVm::getCurrent()
 {
-    std::cout << "getCurrent: " << m_code.size() << std::endl;
     return m_code.size();
 }
 
 void ToyVm::run(int start_pc)
 {
-    bool debug = true;
     uint32 reg[2] = { 0, 0 };
     const size_t end = m_code.size();
     uint32 pc = start_pc;
@@ -98,8 +98,11 @@ void ToyVm::run(int start_pc)
             break;
         case ASSERT: {
             int val =  m_mem[++sp];
-            printf("assert: %d != 0\n", val);
             assert(val != 0);
+            } break;
+        case PRINT: {
+            int val =  m_mem[++sp];
+            printf("%d\n", val);
             } break;
         default:
             assert(0);
@@ -164,6 +167,9 @@ void ToyVm::print_code(int code, int imm)
         break;
     case ASSERT:
         printf("assert");
+        break;
+    case PRINT:
+        printf("print");
         break;
     case JE:
         printf("je %d", imm);

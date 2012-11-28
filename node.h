@@ -42,7 +42,11 @@ public:
 
     Value *value() { return new Value(m_value); }
     Integer(long long value) : m_value(value) { }
-    void print(int indent) const { INDENT; printf("%lld\n", m_value); }
+    void print(int indent) const
+    {
+        INDENT;
+        printf(" %lld\n", m_value);
+    }
     void codeGen(CodeGenContext& context);
 };
 
@@ -64,8 +68,9 @@ class Identifier : public Expression {
 public:
     std::string name;
     Identifier(const std::string& name) : name(name) { }
-    void print(int indent) const {
-        printf("%s", name.c_str());
+    void print(int indent) const
+    {
+        printf("%*s %s\n", indent, "", name.c_str());
     }
 
     void codeGen(CodeGenContext& context);
@@ -93,11 +98,7 @@ public:
         lhs(lhs), rhs(rhs), op(op)
     {
     }
-    void print(int indent) const {
-        PRINT_ID("binop\n");
-        lhs->print(indent+1);
-        rhs->print(indent+1);
-    }
+    void print(int indent) const;
     void codeGen(CodeGenContext& context);
 };
 
@@ -162,9 +163,9 @@ public:
 
     void print(int indent) const
     {
-        PRINT_ID("variable declaration: ");
+        PRINT_ID("variable declaration:\n");
         id->print(indent + 1);
-        printf(" = \n");
+        INDENT; printf(" = \n");
         assignmentExpr->print(indent + 1);
 
     }
@@ -253,7 +254,33 @@ public:
 
     }
 
+    void print(int indent) const
+    {
+        PRINT_ID("assert\n");
+        expr->print(indent + 1);
+    }
+
     void codeGen(CodeGenContext &context);
 private:
     Expression *expr;
 };
+
+class PrintStatement : public Statement
+{
+public:
+    PrintStatement(Expression *expr):
+        expr(expr)
+    {
+
+    }
+
+    void print(int indent) const
+    {
+        PRINT_ID("print\n");
+        expr->print(indent + 1);
+    }
+    void codeGen(CodeGenContext &context);
+private:
+    Expression *expr;
+};
+

@@ -16,6 +16,7 @@ double print(double x) {
 }
 
 extern FILE *yyin;
+extern int debug;
 
 int main(int argc, char **argv)
 {
@@ -26,7 +27,6 @@ int main(int argc, char **argv)
     yyparse();
 
     if (error_count == 0) {
-        std::cout << programBlock << std::endl;
         CodeGenContext context;
         context.generateCode(*programBlock);
 

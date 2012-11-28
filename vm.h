@@ -40,7 +40,9 @@ public:
     enum Code {
         LD, LDI, ST, ADD, MUL, CMP, SUB, SUBI, PUT, JNZ,
         PUSHI, PUSH, PUSHM, POP, POPM,
-        CALL, RET, ASSERT, JE, JNE, JMP,
+        CALL, RET,
+        ASSERT, PRINT,
+        JE, JNE, JMP,
         END_OF_CODE
     };
     ToyVm()
@@ -100,6 +102,9 @@ public:
         encode(ASSERT);
     }
 
+    void vprint() {
+        encode(PRINT);
+    }
     void vjnz(Reg r, int offset) {
         encode(JNZ, r, static_cast<uint16>(offset));
     }

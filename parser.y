@@ -35,9 +35,9 @@
  */
 %token <string> TIDENTIFIER TINTEGER TDOUBLE TSTRING
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
-%token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON
+%token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON TNEWLINE
 %token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT
+%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT TPRINT
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -49,9 +49,10 @@
 %type <varvec> func_decl_args
 %type <exprvec> call_args
 %type <block> program stmts block
-%type <stmt> stmt var_decl func_decl extern_func_decl if_stmt return_stmt assert_stmt
+%type <stmt> stmt var_decl func_decl extern_func_decl if_stmt return_stmt assert_stmt print_stmt
 %type <token> comparison
 /* Operator precedence for mathematical operators */
+%left TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
 
@@ -64,6 +65,7 @@ program : stmts { programBlock = $1; }
 
 stmts : stmt { $$ = new Block(); $$->statements.push_back($<stmt>1); }
       | stmts stmt { $1->statements.push_back($<stmt>2); }
+      | stmts TNEWLINE {}
       | stmts error { yyclearin; yyerrok; }
       ;
 
@@ -73,6 +75,7 @@ stmt : var_decl TSEMICOLON
      | if_stmt
      | return_stmt TSEMICOLON
      | assert_stmt TSEMICOLON
+     | print_stmt TSEMICOLON
      | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
      ;
 
@@ -89,6 +92,9 @@ if_stmt  : TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3,
          ;
 
 assert_stmt: TASSERT expr { $$ = new AssertStatement($2); }
+         ;
+
+print_stmt: TPRINT expr { $$ = new PrintStatement($2); }
          ;
 
 return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }
@@ -120,6 +126,10 @@ expr : ident TEQUAL expr { $$ = new Assignment($<ident>1, $3); }
      | ident { $<ident>$ = $1; }
      | numeric
      | string
+     | expr TPLUS expr { $$ = new BinaryOperator($1, $2, $3); }
+     | expr TMINUS expr { $$ = new BinaryOperator($1, $2, $3); }
+     | expr TMUL expr { $$ = new BinaryOperator($1, $2, $3); }
+     | expr TDIV expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr comparison expr { $$ = new BinaryOperator($1, $2, $3); }
      | TLPAREN expr TRPAREN { $$ = $2; }
      ;
@@ -130,7 +140,6 @@ call_args : /*blank*/  { $$ = new ExpressionList(); }
           ;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE
-           | TPLUS | TMINUS | TMUL | TDIV
            ;
 
 %%

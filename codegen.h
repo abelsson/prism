@@ -62,8 +62,8 @@ public:
 
     CodeGenContext() { }
 
-    void generateCode(Block& root);
-    void runCode();
+    void generate_code(Block& root);
+    void run_code();
 
     std::map<std::string, Value*>&locals()
     {
@@ -94,18 +94,19 @@ public:
         }
         return 0;
     }
-    BasicBlock *currentBlock()
+
+    BasicBlock *current_block()
     {
         return blocks.front()->block;
     }
 
-    void pushBlock(BasicBlock *block)
+    void push_block(BasicBlock *block)
     {
         blocks.push_front(new CodeGenBlock());
         blocks.front()->block = block;
     }
 
-    void popBlock()
+    void pop_block()
     {
         CodeGenBlock *top = blocks.front();
         blocks.pop_front();

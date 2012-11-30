@@ -9,18 +9,18 @@ int addr = 0;
 int debug = 0;
 
 /* Compile the AST into a module */
-void CodeGenContext::generateCode(Block& root)
+void CodeGenContext::generate_code(Block& root)
 {
     if (debug)
         std::cout << "Generating code...\n";
     BasicBlock *bblock = new BasicBlock();
-    pushBlock(bblock);
+    push_block(bblock);
     root.codeGen(*this, true);
     //popBlock();
 }
 
 /* Executes the AST by running the main function */
-void CodeGenContext::runCode()
+void CodeGenContext::run_code()
 {
     if (debug) {
         dump();
@@ -176,12 +176,14 @@ void Block::codeGen(CodeGenContext& context, int local_funcs_only)
         std::cout << "Creating block" << endl;
 }
 
+#if 0
 void ExpressionStatement::codeGen(CodeGenContext& context)
 {
     if (debug)
         std::cout << "Generating code for " << typeid(expression).name() << endl;
     return expression.codeGen(context);
 }
+#endif
 
 void VariableDeclaration::codeGen(CodeGenContext& context)
 {
@@ -195,6 +197,7 @@ void VariableDeclaration::codeGen(CodeGenContext& context)
     }
 }
 
+#if 0
 void ExternDeclaration::codeGen(CodeGenContext& context)
 {
     VariableList::const_iterator it;
@@ -205,6 +208,7 @@ void ExternDeclaration::codeGen(CodeGenContext& context)
     if (debug)
         std::cout << "Creating external function: " << id->name << endl;
 }
+#endif
 
 void FunctionDeclaration::codeGen(CodeGenContext& context)
 {
@@ -212,7 +216,7 @@ void FunctionDeclaration::codeGen(CodeGenContext& context)
 
     Function *f = new Function();
 
-    context.pushBlock(bblock);
+    context.push_block(bblock);
     VariableList::const_iterator it;
     for (it = arguments->begin(); it != arguments->end(); it++) {
         if (debug)
@@ -227,7 +231,7 @@ void FunctionDeclaration::codeGen(CodeGenContext& context)
     f->pm_addr = context.getCurrent();
     block->codeGen(context, false);
     context.vret();
-    context.popBlock();
+    context.pop_block();
 
     context.functions().insert(std::make_pair(id->name, f));
 

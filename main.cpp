@@ -28,11 +28,11 @@ int main(int argc, char **argv)
 
     if (error_count == 0) {
         CodeGenContext context;
-        context.generateCode(*programBlock);
+        context.generate_code(*programBlock);
 
-        programBlock->print(0);
+        std::cout << programBlock->yaml() << std::endl;
 
-        context.runCode();
+        context.run_code();
     }
 
     return 0;

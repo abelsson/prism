@@ -5,6 +5,7 @@
 #define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t) (yylval.token = t)
 extern "C" int yywrap() { }
+int check_type();
 extern int line_num;
 %}
 
@@ -41,7 +42,19 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 "func"                  return TOKEN(TFUNC);
 "assert"                return TOKEN(TASSERT);
 "print"                 return TOKEN(TPRINT);
-[a-zA-Z_][a-zA-Z0-9_]*  SAVE_TOKEN; return TIDENTIFIER;
+[a-zA-Z_][a-zA-Z0-9_]*  SAVE_TOKEN; return check_type();
 .                       printf("Unknown token!\n"); yyterminate();
 
 %%
+
+int check_type()
+{
+    std::string token =  std::string(yytext, yyleng);
+
+    if (token == "int" ||
+        token == "double" ||
+        token == "string")
+        return TTYPENAME;
+
+    return(TIDENTIFIER);
+}

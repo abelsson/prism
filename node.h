@@ -3,6 +3,8 @@
 #include <typeinfo>
 #include "codegen.h"
 
+#include "yaml-cpp/yaml.h"
+
 class CodeGenContext;
 class Statement;
 class Expression;
@@ -22,7 +24,7 @@ public:
     virtual ~Node() {}
     virtual Value *value() { return NULL; }
     virtual Type *type() { return NULL; }
-    virtual void print(int indent) const = 0;
+    virtual YAML::Node yaml() const = 0;
     virtual void codeGen(CodeGenContext& context) { }
 };
 
@@ -47,6 +49,14 @@ public:
         INDENT;
         printf(" %lld\n", m_value);
     }
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "integer";
+        node["value"] = m_value;
+        return node;
+    }
+
     void codeGen(CodeGenContext& context);
 };
 
@@ -54,6 +64,13 @@ class Double : public Expression {
 public:
     double value;
     Double(double value) : value(value) { }
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "double";
+        node["value"] = value;
+        return node;
+    }
     void codeGen(CodeGenContext& context);
 };
 
@@ -62,7 +79,31 @@ public:
     std::string value;
     String(const std::string* value) : value(*value) { }
     void codeGen(CodeGenContext& context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "string";
+        node["value"] = value;
+        return node;
+    }
 };
+
+class Typename : public Expression {
+public:
+    std::string name;
+    Typename(const std::string& name) : name(name) { }
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "typename";
+        node["value"] = name;
+        return node;
+    }
+
+    void codeGen(CodeGenContext& context) {};
+};
+
 
 class Identifier : public Expression {
 public:
@@ -71,6 +112,14 @@ public:
     void print(int indent) const
     {
         printf("%*s %s\n", indent, "", name.c_str());
+    }
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "identifier";
+        node["value"] = name;
+        return node;
     }
 
     void codeGen(CodeGenContext& context);
@@ -86,6 +135,19 @@ public:
         id(id), arguments(arguments) { }
     MethodCall(const Identifier* id) : id(id) { }
     void codeGen(CodeGenContext& context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "methodcall";
+
+        YAML::Node args = node["arguments"];
+        for(auto it : *arguments)
+            args.push_back(it->yaml());
+
+        node["value"] = id->yaml();
+
+        return node;
+    }
 };
 
 class BinaryOperator : public Expression {
@@ -100,6 +162,14 @@ public:
     }
     void print(int indent) const;
     void codeGen(CodeGenContext& context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "binop";
+        node["left"] = lhs->yaml();
+        node["right"] = rhs->yaml();
+        return node;
+    }
 };
 
 class Assignment : public Expression {
@@ -114,6 +184,14 @@ public:
         rhs->print(indent+1);
     }
     void codeGen(CodeGenContext& context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "assign";
+        node["left"] = lhs->yaml();
+        node["right"] = rhs->yaml();
+        return node;
+    }
 };
 
 class Block : public Expression {
@@ -127,8 +205,19 @@ public:
             statements[i]->print(indent+1);
         }
     }
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "block";
+
+        YAML::Node stmnts = node["statements"];
+        for(auto it : statements)
+            stmnts.push_back(it->yaml());
+        return node;
+    }
 };
 
+#if 0
 class ExpressionStatement : public Statement {
 public:
     Expression& expression;
@@ -136,19 +225,20 @@ public:
         expression(expression) { }
     void codeGen(CodeGenContext& context);
 };
+#endif
 
 class VariableDeclaration : public Statement {
 public:
-    const Identifier* type;
+    const Typename* type;
     Identifier* id;
     Expression* assignmentExpr;
     Value *v;
-    VariableDeclaration(const Identifier* type, Identifier* id) :
+    VariableDeclaration(const Typename* type, Identifier* id) :
         type(type), id(id), v(0)
     {
     }
 
-    VariableDeclaration(const Identifier* type, Identifier* id, Expression *assignmentExpr) :
+    VariableDeclaration(const Typename* type, Identifier* id, Expression *assignmentExpr) :
         type(type), id(id), assignmentExpr(assignmentExpr), v(0)
     {
 
@@ -170,16 +260,27 @@ public:
 
     }
 
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "vardecl";
+        node["variable-type"] = type->yaml();
+        node["identifier"] = id->yaml();
+        if (assignmentExpr)
+            node["assign"] = assignmentExpr->yaml();
+        return node;
+    }
+
     void codeGen(CodeGenContext& context);
 };
 
 class FunctionDeclaration : public Statement {
 public:
-    const Identifier* type;
+    const Typename* type;
     const Identifier* id;
     const VariableList* arguments;
     Block* block;
-    FunctionDeclaration(const Identifier* type,
+    FunctionDeclaration(const Typename* type,
                         const Identifier* id,
                         const VariableList* arguments,
                         Block* block) :
@@ -196,8 +297,24 @@ public:
     }
 
     void codeGen(CodeGenContext& context);
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "function";
+        node["name"] = id->yaml();
+        node["return-type"] = type->yaml();
+        YAML::Node args = node["arguments"];
+        for(auto it : *arguments)
+            args.push_back(it->yaml());
+
+        node["block"] = block->yaml();
+
+        return node;
+    }
 };
 
+#if 0
 class ExternDeclaration : public Statement
 {
 public:
@@ -213,6 +330,7 @@ public:
 
     void codeGen(CodeGenContext& context);
 };
+#endif
 
 
 class IfStatement : public Statement
@@ -228,6 +346,16 @@ public:
     }
 
     void codeGen(CodeGenContext& context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "if";
+        node["expr"] = evalExpr->yaml();
+        node["true-branch"] = thenBlock->yaml();
+        if (elseBlock)
+            node["false-branch"] = elseBlock->yaml();
+        return node;
+    }
 };
 
 class ReturnStatement : public Statement
@@ -240,6 +368,13 @@ public:
     }
 
     void codeGen(CodeGenContext &context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "return";
+        node["expr"] = expr->yaml();
+        return node;
+    }
 private:
     Expression *expr;
 };
@@ -261,6 +396,13 @@ public:
     }
 
     void codeGen(CodeGenContext &context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "assert";
+        node["expr"] = expr->yaml();
+        return node;
+    }
 private:
     Expression *expr;
 };
@@ -280,6 +422,13 @@ public:
         expr->print(indent + 1);
     }
     void codeGen(CodeGenContext &context);
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["type"] = "print";
+        node["expr"] = expr->yaml();
+        return node;
+    }
 private:
     Expression *expr;
 };

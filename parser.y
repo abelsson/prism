@@ -22,6 +22,7 @@
     Expression *expr;
     Statement *stmt;
     Identifier *ident;
+    Typename *type;
     VariableDeclaration *var_decl;
     std::vector<VariableDeclaration*> *varvec;
     std::vector<Expression*> *exprvec;
@@ -33,7 +34,7 @@
    match our tokens.l lex file. We also define the node type
    they represent.
  */
-%token <string> TIDENTIFIER TINTEGER TDOUBLE TSTRING
+%token <string> TIDENTIFIER TTYPENAME TINTEGER TDOUBLE TSTRING
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON TNEWLINE
 %token <token> TPLUS TMINUS TMUL TDIV
@@ -45,11 +46,12 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident
+%type <type> type
 %type <expr> numeric string expr
 %type <varvec> func_decl_args
 %type <exprvec> call_args
 %type <block> program stmts block
-%type <stmt> stmt var_decl func_decl extern_func_decl if_stmt return_stmt assert_stmt print_stmt
+%type <stmt> stmt var_decl func_decl if_stmt return_stmt assert_stmt print_stmt
 %type <token> comparison
 /* Operator precedence for mathematical operators */
 %left TCEQ TCNE TCLT TCLE TCGT TCGE
@@ -71,20 +73,20 @@ stmts : stmt { $$ = new Block(); $$->statements.push_back($<stmt>1); }
 
 stmt : var_decl TSEMICOLON
      | func_decl
-     | extern_func_decl
+//     | extern_func_decl
      | if_stmt
      | return_stmt TSEMICOLON
      | assert_stmt TSEMICOLON
      | print_stmt TSEMICOLON
-     | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
+     // | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
       | TLBRACE TRBRACE { $$ = new Block(); }
       ;
 
-var_decl : ident ident { $$ = new VariableDeclaration($1, $2); }
-         | ident ident TEQUAL expr { $$ = new VariableDeclaration($1, $2, $4); }
+var_decl : type ident { $$ = new VariableDeclaration($1, $2); }
+         | type ident TEQUAL expr { $$ = new VariableDeclaration($1, $2, $4); }
          ;
 
 if_stmt  : TIF TLPAREN expr TRPAREN block TELSE block { $$ = new IfStatement($3, $5, $7); }
@@ -99,10 +101,10 @@ print_stmt: TPRINT expr { $$ = new PrintStatement($2); }
 
 return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }
          ;
-extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration($2, $3, $5); }
-         ;
+//extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration($2, $3, $5); }
+//         ;
 
-func_decl : TFUNC ident TEQUAL ident TLPAREN func_decl_args TRPAREN block
+func_decl : TFUNC ident TEQUAL type TLPAREN func_decl_args TRPAREN block
             { $$ = new FunctionDeclaration($4, $2, $6, $8); }
           ;
 
@@ -112,6 +114,9 @@ func_decl_args : /*blank*/  { $$ = new VariableList(); }
           ;
 
 ident : TIDENTIFIER { $$ = new Identifier(*$1); delete $1; }
+      ;
+
+type : TTYPENAME { $$ = new Typename(*$1); delete $1; }
       ;
 
 numeric : TINTEGER { $$ = new Integer(atol($1->c_str())); delete $1; }

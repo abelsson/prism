@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (prism)
 
-set(CMAKE_CXX_FLAGS -fno-operator-names)
+set(CMAKE_CXX_FLAGS "-std=c++11 -fno-operator-names")
 
 set(SOURCES
   codegen.cpp
@@ -12,12 +12,11 @@ set(SOURCES
   node.h
   tokens.l
   parser.y
-  Makefile
   test.prism
   vm.h
   vm.cpp
 )
-include_directories(. xbyak ${PROJECT_BINARY_DIR})
+include_directories(. xbyak yaml-cpp/include ${PROJECT_BINARY_DIR})
 
 
 # Create target for the parser
@@ -55,4 +54,5 @@ SET_SOURCE_FILES_PROPERTIES(${PROJECT_BINARY_DIR}/tokens.cpp GENERATED)
  INCLUDE_DIRECTORIES(${PROJECT_BINARY_DIR}/src)
 
 add_subdirectory(yaml-cpp)
+link_libraries(yaml-cpp)
 add_executable (parser ${SOURCES})

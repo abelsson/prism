@@ -31,7 +31,7 @@ class Visitor
 class Type
 {
 public:
-    enum { INT, DOUBLE, STRING, UNKNOWN, VOID };
+    enum { INT, DOUBLE, STRING, LIST, UNKNOWN, VOID };
     Type() { id = UNKNOWN; }
     Type(int id): id(id) {}
     int id;
@@ -40,10 +40,10 @@ public:
     {
         switch(id)
         {
-        case INT: return "int";
-        case DOUBLE: return "double";
-        case STRING: return "string";
-        case VOID: return "void";
+        case INT: return "Int";
+        case DOUBLE: return "Double";
+        case STRING: return "String";
+        case VOID: return "Void";
         case UNKNOWN:
         default: return "unknown";
         }
@@ -129,8 +129,8 @@ public:
 
 class Double : public Expression {
 public:    
-    double value;
-    Double(double value) : value(value) { }
+    double m_value;
+    Double(double value) : m_value(value) { }
 
     Type type() const
     {
@@ -141,7 +141,7 @@ public:
     {
         YAML::Node node;
         node["id"] = "double";
-        node["value"] = value;
+        node["value"] = m_value;
         return node;
     }
 
@@ -155,9 +155,8 @@ public:
 
 class String : public Expression {
 public:
-    std::string value;
-    String(const std::string* value) : value(*value) { }
-    void codeGen(CodeGenContext& context);
+    std::string m_value;
+    String(const std::string* value) : m_value(*value) { }
 
     Type type() const
     {
@@ -168,7 +167,7 @@ public:
     {
         YAML::Node node;
         node["id"] = "string";
-        node["value"] = value;
+        node["value"] = m_value;
         return node;
     }
 
@@ -176,6 +175,8 @@ public:
     {
         m_context = parent;
     }
+
+    void codeGen(CodeGenContext& context);
 
 };
 
@@ -186,12 +187,14 @@ public:
 
     Type type() const
     {
-        if (m_name == "int")
+        if (m_name == "Int")
             return Type::INT;
-        else if (m_name == "string")
+        else if (m_name == "String")
             return Type::STRING;
-        else if (m_name == "double")
+        else if (m_name == "Double")
             return Type::DOUBLE;
+        else if (m_name == "List")
+            return Type::LIST;
 
         return Type::UNKNOWN;
     }
@@ -212,6 +215,45 @@ public:
     void codeGen(CodeGenContext& context) {};
 };
 
+class ListLiteral : public Expression {
+
+    std::vector<Expression*> m_elements;
+public:
+    ListLiteral()
+    {
+        for(auto it : m_elements)
+            add_child(it);
+    }
+
+    Type type() const
+    {
+        return Type::UNKNOWN;
+    }
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["id"] = "listliteral";
+        YAML::Node elements = node["elements"];
+        for(auto it : m_elements)
+            elements.push_back(it->yaml());
+        return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        for(auto it : m_elements)
+            it->set_context(m_context);
+    }
+
+    void add(Expression *x)
+    {
+        m_elements.push_back(x);
+    }
+
+    void codeGen(CodeGenContext& context);
+};
 
 class Identifier : public Expression {
 public:
@@ -732,6 +774,48 @@ public:
 
 private:
     Expression *m_expr;
+};
+
+
+class ForeachStatement : public Statement
+{
+    VariableDeclaration *m_var_decl;
+    Expression *m_expr;
+    Block *m_block;
+public:
+    ForeachStatement(VariableDeclaration *var, Expression *expr, Block *block):
+        m_var_decl(var), m_expr(expr), m_block(block)
+    {
+        add_child(m_var_decl);
+        add_child(m_expr);
+        add_child(m_block);
+    }
+
+    Type type() const
+    {
+        return Type::VOID;
+    }
+
+
+    void codeGen(CodeGenContext &context);
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["id"] = "foreach";
+        node["var"] = m_var_decl->yaml();
+        node["iter"] = m_expr->yaml();
+        node["block"] = m_block->yaml();
+        return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_var_decl->set_context(parent);
+        m_expr->set_context(parent);
+        m_block->set_context(parent);
+    }
 };
 
 class TypeVisitor : public Visitor

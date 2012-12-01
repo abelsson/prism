@@ -1,6 +1,9 @@
-func main = int() {
-  int x = 2;
-  assert 5 + x * 5 == 15;
-  assert 5 * x + 5 == 15;
-  print 999*5;
+func main = Int() {
+  List lst1 = [1,2,3,4];
+  List lst2 = [1,2];
+
+  foreach(Int y : lst1) {
+    print 10 + y;
+  }
+
 }

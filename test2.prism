@@ -1,14 +1,15 @@
-func f = int(int x ) {
-  x = x + 2;
- 
-  func add = int(int y) {
-    return y + x;
+func main = Int() {
+  Int x = 2;
+  assert 5 + x * 5 == 15;
+  assert 5 * x + 5 == 15;
+
+  print "Hello world";
+  print "foobar";
+
+  List z = [4, x + 4, 6];
+  print z;
+
+  foreach(Int y : z) {
+    print x;
   }
-  return add(x);
 }
-
-func main = int() {
-  int l=f(8);
-  int x = l + l + l;
-}
-

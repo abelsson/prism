@@ -28,7 +28,6 @@ int main(int argc, char **argv)
 
     if (error_count == 0) {
         CodeGenContext context;
-        context.generate_code(*programBlock);
 
         Context root(0);
 
@@ -38,6 +37,7 @@ int main(int argc, char **argv)
 
         std::cout << programBlock->yaml() << std::endl;
 
+        context.generate_code(*programBlock);
         context.run_code();
     }
 

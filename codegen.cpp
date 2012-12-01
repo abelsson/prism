@@ -50,13 +50,26 @@ void Integer::codeGen(CodeGenContext& context)
 void Double::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Creating double: " << value << endl;
+        std::cout << "Creating double: " << m_value << endl;
 }
 
 
 void String::codeGen(CodeGenContext &context)
 {
+    int ref_id = context.add_constant(&m_value);
+    context.vpushs(ref_id);
 }
+
+void ListLiteral::codeGen(CodeGenContext& context)
+{
+    int count = 0;
+    for(auto it : m_elements) {
+        it->codeGen(context);
+        count++;
+    }
+    context.vmake_list(count);
+}
+
 
 void Identifier::codeGen(CodeGenContext& context)
 {
@@ -158,17 +171,16 @@ void Assignment::codeGen(CodeGenContext& context)
 
 void Block::codeGen(CodeGenContext& context, int local_funcs_only)
 {
-    StatementList::const_iterator it;
-    for (it = statements.begin(); it != statements.end(); it++) {
-        if (local_funcs_only && typeid(**it) == typeid(FunctionDeclaration)) {
+    for (auto it : statements) {
+        if (local_funcs_only && typeid(*it) == typeid(FunctionDeclaration)) {
             if (debug)
-                std::cout << "Generating code func for " << typeid(**it).name() << endl;
-            (**it).codeGen(context);
+                std::cout << "Generating code func for " << typeid(*it).name() << endl;
+            (*it).codeGen(context);
         }
-        if (!local_funcs_only && typeid(**it) != typeid(FunctionDeclaration)) {
+        if (!local_funcs_only && typeid(*it) != typeid(FunctionDeclaration)) {
             if (debug)
-                std::cout << "Generating code for " << typeid(**it).name() << endl;
-            (**it).codeGen(context);
+                std::cout << "Generating code for " << typeid(*it).name() << endl;
+            (*it).codeGen(context);
         }
     }
 
@@ -278,6 +290,30 @@ void AssertStatement::codeGen(CodeGenContext &context)
 void PrintStatement::codeGen(CodeGenContext &context)
 {
     m_expr->codeGen(context);
-    context.vprint();
+
+    switch(m_expr->type().id)
+    {
+    case Type::INT:
+        context.vprint();
+        break;
+    case Type::STRING:
+        context.vprints();
+        break;
+    case Type::LIST:
+        context.vprintl();
+        break;
+    }
 }
 
+
+void ForeachStatement::codeGen(CodeGenContext &context)
+{
+    m_var_decl->codeGen(context);
+    m_expr->codeGen(context);
+    context.vmake_iter();
+    int pos = context.getCurrent();
+    context.viter_value();
+    context.vpop(context.locals()[m_var_decl->m_name->m_name]->addr);
+    m_block->codeGen(context, false);
+    context.vloop_iter(pos);
+}

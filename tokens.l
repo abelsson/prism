@@ -26,6 +26,8 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 ">="                    return TOKEN(TCGE);
 "("                     return TOKEN(TLPAREN);
 ")"                     return TOKEN(TRPAREN);
+"["                     return TOKEN(TLBRACKET);
+"]"                     return TOKEN(TRBRACKET);
 "{"                     return TOKEN(TLBRACE);
 "}"                     return TOKEN(TRBRACE);
 "."                     return TOKEN(TDOT);
@@ -35,6 +37,7 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 "*"                     return TOKEN(TMUL);
 "/"                     return TOKEN(TDIV);
 ";"                     return TOKEN(TSEMICOLON);
+":"                     return TOKEN(TCOLON);
 "extern"                return TOKEN(TEXTERN);
 "if"                    return TOKEN(TIF);
 "else"                  return TOKEN(TELSE);
@@ -42,7 +45,9 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 "func"                  return TOKEN(TFUNC);
 "assert"                return TOKEN(TASSERT);
 "print"                 return TOKEN(TPRINT);
-[a-zA-Z_][a-zA-Z0-9_]*  SAVE_TOKEN; return check_type();
+"foreach"               return TOKEN(TFOREACH);
+[A-Z][a-zA-Z0-0_]*      SAVE_TOKEN; return TTYPENAME;
+[a-z_][a-zA-Z0-9_]*     SAVE_TOKEN; return TIDENTIFIER;
 .                       printf("Unknown token!\n"); yyterminate();
 
 %%

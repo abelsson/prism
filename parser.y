@@ -23,6 +23,7 @@
     Statement *stmt;
     Identifier *ident;
     Typename *type;
+    ListLiteral *listliteral;
     VariableDeclaration *var_decl;
     std::vector<VariableDeclaration*> *varvec;
     std::vector<Expression*> *exprvec;
@@ -36,9 +37,9 @@
  */
 %token <string> TIDENTIFIER TTYPENAME TINTEGER TDOUBLE TSTRING
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
-%token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT TSEMICOLON TNEWLINE
+%token <token> TLPAREN TRPAREN TLBRACE TRBRACE TLBRACKET TRBRACKET TCOMMA TDOT TSEMICOLON TCOLON TNEWLINE
 %token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT TPRINT
+%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT TPRINT TFOREACH
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -48,10 +49,12 @@
 %type <ident> ident
 %type <type> type
 %type <expr> numeric string expr
+%type <listliteral> list_elements list_literal
 %type <varvec> func_decl_args
 %type <exprvec> call_args
 %type <block> program stmts block
-%type <stmt> stmt var_decl func_decl if_stmt return_stmt assert_stmt print_stmt
+%type <stmt> stmt func_decl if_stmt return_stmt assert_stmt print_stmt foreach_stmt
+%type <var_decl> var_decl
 %type <token> comparison
 /* Operator precedence for mathematical operators */
 %left TCEQ TCNE TCLT TCLE TCGT TCGE
@@ -75,6 +78,7 @@ stmt : var_decl TSEMICOLON
      | func_decl
 //     | extern_func_decl
      | if_stmt
+     | foreach_stmt
      | return_stmt TSEMICOLON
      | assert_stmt TSEMICOLON
      | print_stmt TSEMICOLON
@@ -101,6 +105,9 @@ print_stmt: TPRINT expr { $$ = new PrintStatement($2); }
 
 return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }
          ;
+
+foreach_stmt: TFOREACH TLPAREN var_decl TCOLON expr TRPAREN block { $$ = new ForeachStatement($3, $5, $7); }
+         ;
 //extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration($2, $3, $5); }
 //         ;
 
@@ -126,11 +133,23 @@ numeric : TINTEGER { $$ = new Integer(atol($1->c_str())); delete $1; }
 string : TSTRING { $$ = new String($1); delete $1; }
        ;
 
+literal : numeric
+        | string
+        ;
+
+list_literal : TLBRACKET list_elements TRBRACKET { $$ = $2; }
+             ;
+
+list_elements  : /*blank*/  { $$ = new ListLiteral(); }
+               | expr { $$ = new ListLiteral(); $$->add($1); }
+               | list_elements TCOMMA expr { $1->add($3); }
+               ;
+
 expr : ident TEQUAL expr { $$ = new Assignment($<ident>1, $3); }
      | ident TLPAREN call_args TRPAREN { $$ = new MethodCall($1, $3);  }
      | ident { $<ident>$ = $1; }
-     | numeric
-     | string
+     | literal
+     | list_literal
      | expr TPLUS expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr TMINUS expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr TMUL expr { $$ = new BinaryOperator($1, $2, $3); }

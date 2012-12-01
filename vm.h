@@ -31,6 +31,18 @@
 
 using namespace Xbyak;
 
+struct IValue;
+
+struct IValue {
+    union {
+        int int_value;
+        double float_value;
+        const std::string *str_value;
+        std::list<IValue> *list_value;
+        std::list<IValue>::iterator *list_iter;
+    };
+};
+
 class ToyVm : public Xbyak::CodeGenerator {
     typedef std::vector<uint32> Buffer;
 public:
@@ -40,20 +52,27 @@ public:
     enum Code {
         LD, LDI, ST, ADD, MUL, CMP, SUB, SUBI, PUT, JNZ,
         PUSHI, PUSH, PUSHM, POP, POPM,
+        PUSHS,
+        MAKE_LIST, MAKE_ITER, LOOP_ITER, ITER_VALUE,
         CALL, RET,
-        ASSERT, PRINT,
+        ASSERT, PRINT, PRINTS, PRINTL,
         JE, JNE, JMP,
         END_OF_CODE
     };
     ToyVm()
          : m_mark(0)
     {
-        ::memset(m_mem, 0, sizeof(m_mem));
+        m_mem = new IValue[65536];
     }
 
     void vpush(uint16 imm)
     {
         encode(PUSHI, A, imm);
+    }
+
+    void vpushs(uint16 imm)
+    {
+        encode(PUSHS, A, imm);
     }
 
     void vpushm(uint16 idx)
@@ -90,6 +109,26 @@ public:
         encode(ST, r, idx);
     }
 
+    void vmake_list(int num)
+    {
+        encode(MAKE_LIST, A, num);
+    }
+
+    void vmake_iter()
+    {
+        encode(MAKE_ITER);
+    }
+
+    void vloop_iter(int pc)
+    {
+        encode(LOOP_ITER, A, pc);
+    }
+
+    void viter_value()
+    {
+        encode(ITER_VALUE);
+    }
+
     void vadd() {
         encode(ADD);
     }
@@ -104,6 +143,14 @@ public:
 
     void vprint() {
         encode(PRINT);
+    }
+
+    void vprints() {
+        encode(PRINTS);
+    }
+
+    void vprintl() {
+        encode(PRINTL);
     }
     void vjnz(Reg r, int offset) {
         encode(JNZ, r, static_cast<uint16>(offset));
@@ -158,10 +205,10 @@ public:
         printf("---\n");
         printf("m_mem[] = ");
         for(int i=0;i<8;i++)
-            printf("%04x ", m_mem[i]);
+            printf("%04x ", m_mem[i].int_value);
         printf("\nsp %d : [ ", m_sp);
         for(int i=m_sp+1;i<65536;i++)
-            printf("%x ", m_mem[i]);
+            printf("%x ", m_mem[i].int_value);
         printf("]\n");
     }
 
@@ -178,9 +225,21 @@ public:
     }
 
     void print_code(int code, int imm);
+    int add_constant(const std::string* str)
+    {
+        IValue value;
+        value.str_value = str;
+        m_constants.push_back(value);
+        printf("Add string constant at %ld\n", m_constants.size() - 1);
+        return m_constants.size() - 1;
+    }
+
 private:
 
-    uint32 m_mem[65536];
+    IValue* m_mem;
+
+    std::vector<IValue> m_constants;
+
     uint32 m_callstack[128];
     Buffer m_code;
     int m_sp;

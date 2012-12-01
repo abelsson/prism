@@ -31,54 +31,42 @@ void ToyVm::run(int start_pc)
         uint32 code, r, imm;
         decode(code, r, imm, x);
         switch (code) {
-        case LDI:
-            reg[r] = imm;
-            break;
-        case LD:
-            reg[r] = m_mem[imm];
-            break;
-        case ST:
-            m_mem[imm] = reg[r];
-            break;
         case ADD: {
-            int a = m_mem[++sp];
-            int b = m_mem[++sp];
-            m_mem[sp--] = a + b;
+            int a = m_mem[++sp].int_value;
+            int b = m_mem[++sp].int_value;
+            m_mem[sp--].int_value = a + b;
             } break;
-        case PUSH:
-            m_mem[sp--] = reg[r];
-            break;
         case PUSHI:
-            m_mem[sp--] = imm;
+            m_mem[sp--].int_value = imm;
+            break;
+        case PUSHS:
+            m_mem[sp--].str_value = m_constants[imm].str_value;
             break;
         case PUSHM:
             m_mem[sp--] = m_mem[imm];
-            break;
-        case POP:
-            reg[r] = m_mem[++sp];
             break;
         case POPM:
             m_mem[imm] = m_mem[++sp];
             break;
         case MUL: {
-            int a = m_mem[++sp];
-            int b = m_mem[++sp];
-            m_mem[sp--] = a * b;
+            int a = m_mem[++sp].int_value;
+            int b = m_mem[++sp].int_value;
+            m_mem[sp--].int_value = a * b;
             } break;
         case CMP: {
-            int a = m_mem[++sp];
-            int b = m_mem[++sp];
-            m_mem[sp--] = a == b;
+            int a = m_mem[++sp].int_value;
+            int b = m_mem[++sp].int_value;
+            m_mem[sp--].int_value = a == b;
             }
             break;
         case JE: {
-            int val =  m_mem[++sp];
+            int val =  m_mem[++sp].int_value;
             if (val == 1)
                 pc = imm;
             }
             break;
         case JNE: {
-            int val =  m_mem[++sp];
+            int val =  m_mem[++sp].int_value;
             if (val == 0)
                 pc = imm;
             }
@@ -97,12 +85,47 @@ void ToyVm::run(int start_pc)
             pc = m_callstack[--call_sp];
             break;
         case ASSERT: {
-            int val =  m_mem[++sp];
+            int val =  m_mem[++sp].int_value;
             assert(val != 0);
             } break;
         case PRINT: {
-            int val =  m_mem[++sp];
+            int val =  m_mem[++sp].int_value;
             printf("%d\n", val);
+            } break;
+        case PRINTS: {
+            std::string val =  *m_mem[++sp].str_value;
+            printf("%s\n", val.c_str());
+            } break;
+        case PRINTL: {
+            std::list<IValue>* val =  m_mem[++sp].list_value;
+            for(auto it : *val)
+                printf("%d, ", it.int_value);
+            printf("\n");
+            } break;
+        case MAKE_ITER:
+            m_mem[sp].list_iter = new std::list<IValue>::iterator();
+            *m_mem[sp].list_iter = m_mem[sp + 1].list_value->begin();
+            sp--;
+            break;
+        case LOOP_ITER: {
+            std::list<IValue>::iterator *it = m_mem[sp + 1].list_iter;
+            std::list<IValue> *list = m_mem[sp + 2].list_value;
+            (*it)++;
+            if (*it != list->end()) {
+                pc = imm - 1;
+            }
+            } break;
+        case ITER_VALUE: {
+            std::list<IValue>::iterator *it = m_mem[sp + 1].list_iter;
+            m_mem[sp--] = (**it);
+            } break;
+        case MAKE_LIST: {
+            std::list<IValue> *lst = new std::list<IValue>;
+            for(int i=0; i < imm; i++) {
+                IValue& value = m_mem[++sp];
+                lst->push_front(value);
+            }
+            m_mem[sp--].list_value = lst;
             } break;
         default:
             assert(0);
@@ -112,10 +135,10 @@ void ToyVm::run(int start_pc)
             printf("---\n");
             printf("m_mem[] = ");
             for(int i=0;i<8;i++)
-                printf("%04x ", m_mem[i]);
+                printf("%04x ", m_mem[i].int_value);
             printf("\nsp %d : [ ", sp);
             for(int i=sp+1;i<65536;i++)
-                printf("%x ", m_mem[i]);
+                printf("%x ", m_mem[i].int_value);
 
             printf("]\npc= %d: ", pc);
             print_code(code, imm);
@@ -133,6 +156,7 @@ void ToyVm::dump()
         uint32 x = m_code[i];
         uint32 code, r, imm;
         decode(code, r, imm, x);
+        printf("%02d: ", i);
         print_code(code, imm);
         printf("\n");
     }
@@ -143,6 +167,9 @@ void ToyVm::print_code(int code, int imm)
     switch (code) {
     case PUSHI:
         printf("push %d", imm);
+        break;
+    case PUSHS:
+        printf("pushs %d", imm);
         break;
     case PUSHM:
         printf("push [%d]", imm);
@@ -171,6 +198,12 @@ void ToyVm::print_code(int code, int imm)
     case PRINT:
         printf("print");
         break;
+    case PRINTS:
+        printf("prints");
+        break;
+    case PRINTL:
+        printf("printl");
+        break;
     case JE:
         printf("je %d", imm);
         break;
@@ -179,6 +212,18 @@ void ToyVm::print_code(int code, int imm)
         break;
     case JMP:
         printf("jmp %d", imm);
+        break;
+    case MAKE_LIST:
+        printf("make-list %d", imm);
+        break;
+    case MAKE_ITER:
+        printf("make-iter");
+        break;
+    case LOOP_ITER:
+        printf("loop-iter: %d", imm);
+        break;
+    case ITER_VALUE:
+        printf("push *iter");
         break;
     default:
         printf("Unknown code %d\n", code);

@@ -29,12 +29,6 @@ public:
     } m_value;
 };
 
-class Type
-{
-public:
-    Type(int id): id(id) {}
-    int id;
-};
 
 class BasicBlock
 {

@@ -30,6 +30,12 @@ int main(int argc, char **argv)
         CodeGenContext context;
         context.generate_code(*programBlock);
 
+        Context root(0);
+
+        Visitor *tv = new TypeVisitor;
+        programBlock->set_context(&root);
+        programBlock->accept(tv);
+
         std::cout << programBlock->yaml() << std::endl;
 
         context.run_code();

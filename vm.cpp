@@ -71,7 +71,7 @@ void ToyVm::run(int start_pc)
             m_mem[sp--] = a == b;
             }
             break;
-        case JE:{
+        case JE: {
             int val =  m_mem[++sp];
             if (val == 1)
                 pc = imm;

@@ -15,17 +15,78 @@ typedef std::vector<Expression*> ExpressionList;
 typedef std::vector<VariableDeclaration*> VariableList;
 
 extern int addr;
-
+extern int line_num;
 
 #define PRINT_ID(x) printf("%*s %s", indent, "", x );
 #define INDENT printf("%*s", indent, "");
+
+class Node;
+
+class Visitor
+{
+  public:
+    virtual void visit(Node*) = 0;
+};
+
+class Type
+{
+public:
+    enum { INT, DOUBLE, STRING, UNKNOWN, VOID };
+    Type() { id = UNKNOWN; }
+    Type(int id): id(id) {}
+    int id;
+
+    std::string name()
+    {
+        switch(id)
+        {
+        case INT: return "int";
+        case DOUBLE: return "double";
+        case STRING: return "string";
+        case VOID: return "void";
+        case UNKNOWN:
+        default: return "unknown";
+        }
+    }
+};
+
+class Context;
+
+class Context
+{
+public:
+    Context(Context* parent): m_parent(parent) {}
+
+    std::map<std::string , Type> m_locals;
+    Context* m_parent;
+};
+
 class Node {
 public:
+    Node()
+    {
+        m_line_num = line_num;
+    }
+
     virtual ~Node() {}
     virtual Value *value() { return NULL; }
-    virtual Type *type() { return NULL; }
+    virtual Type type() const = 0;
     virtual YAML::Node yaml() const = 0;
     virtual void codeGen(CodeGenContext& context) { }
+    virtual void set_context(Context* parent) = 0;
+
+    virtual void accept(Visitor* v)
+    {
+        v->visit(this);
+        for(auto it : m_children)
+            it->accept(v);
+    }
+
+    void add_child(Node* child) { m_children.push_back(child); }
+protected:
+    Context* m_context;
+    int m_line_num;
+    std::list<Node*> m_children;
 };
 
 class Expression : public Node {
@@ -39,38 +100,56 @@ public:
 };
 
 class Integer : public Expression {
-public:
+public:    
     long long m_value;
 
     Value *value() { return new Value(m_value); }
     Integer(long long value) : m_value(value) { }
-    void print(int indent) const
+
+    Type type() const
     {
-        INDENT;
-        printf(" %lld\n", m_value);
+        return Type::INT;
     }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "integer";
+        node["id"] = "integer";
         node["value"] = m_value;
         return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
     }
 
     void codeGen(CodeGenContext& context);
 };
 
 class Double : public Expression {
-public:
+public:    
     double value;
     Double(double value) : value(value) { }
+
+    Type type() const
+    {
+        return Type::DOUBLE;
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "double";
+        node["id"] = "double";
         node["value"] = value;
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+    }
+
     void codeGen(CodeGenContext& context);
 };
 
@@ -79,26 +158,55 @@ public:
     std::string value;
     String(const std::string* value) : value(*value) { }
     void codeGen(CodeGenContext& context);
+
+    Type type() const
+    {
+        return Type::STRING;
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "string";
+        node["id"] = "string";
         node["value"] = value;
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+    }
+
 };
 
 class Typename : public Expression {
 public:
-    std::string name;
-    Typename(const std::string& name) : name(name) { }
+    std::string m_name;
+    Typename(const std::string& name) : m_name(name) { }
+
+    Type type() const
+    {
+        if (m_name == "int")
+            return Type::INT;
+        else if (m_name == "string")
+            return Type::STRING;
+        else if (m_name == "double")
+            return Type::DOUBLE;
+
+        return Type::UNKNOWN;
+    }
 
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "typename";
-        node["value"] = name;
+        node["id"] = "typename";
+        node["value"] = m_name;
         return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
     }
 
     void codeGen(CodeGenContext& context) {};
@@ -107,19 +215,38 @@ public:
 
 class Identifier : public Expression {
 public:
-    std::string name;
-    Identifier(const std::string& name) : name(name) { }
+    std::string m_name;
+    Identifier(const std::string& name) : m_name(name) { }
     void print(int indent) const
     {
-        printf("%*s %s\n", indent, "", name.c_str());
+        printf("%*s %s\n", indent, "", m_name.c_str());
+    }
+
+    Type type() const
+    {
+        std::cout << m_context->m_locals.size() << std::endl;
+        if (m_context->m_locals.count(m_name)) {
+            std::cout << " tpyw= " << m_name << " "  << m_context->m_locals[m_name].name() << std::endl;
+            return m_context->m_locals[m_name];
+        }
+        else {
+            return Type::UNKNOWN;
+        }
     }
 
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "identifier";
-        node["value"] = name;
+        node["id"] = "identifier";
+        node["context"] = (size_t)m_context;
+        node["type"] = type().name();
+        node["value"] = m_name;
         return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
     }
 
     void codeGen(CodeGenContext& context);
@@ -127,24 +254,47 @@ public:
 
 class MethodCall : public Expression {
 public:
-    const Identifier* id;
+    Identifier* m_id;
 
-    ExpressionList* arguments;
+    ExpressionList* m_arguments;
 
-    MethodCall(const Identifier* id, ExpressionList* arguments) :
-        id(id), arguments(arguments) { }
-    MethodCall(const Identifier* id) : id(id) { }
+    MethodCall(Identifier* id, ExpressionList* arguments) :
+        m_id(id), m_arguments(arguments)
+    {
+        add_child(m_id);
+        for(auto it : *m_arguments)
+            add_child(it);
+    }
+    MethodCall(Identifier* id) : m_id(id)
+    {
+        add_child(m_id);
+    }
+
     void codeGen(CodeGenContext& context);
+
+    Type type() const
+    {
+        return Type::UNKNOWN;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_id->set_context(parent);
+        for(auto it : *m_arguments)
+            it->set_context(parent);
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "methodcall";
+        node["id"] = "methodcall";
 
         YAML::Node args = node["arguments"];
-        for(auto it : *arguments)
+        for(auto it : *m_arguments)
             args.push_back(it->yaml());
 
-        node["value"] = id->yaml();
+        node["value"] = m_id->yaml();
 
         return node;
     }
@@ -159,17 +309,37 @@ public:
     BinaryOperator(Expression* lhs, int op, Expression* rhs) :
         lhs(lhs), rhs(rhs), op(op)
     {
+        add_child(lhs);
+        add_child(rhs);
     }
     void print(int indent) const;
     void codeGen(CodeGenContext& context);
+
+    Type type() const
+    {
+        if (lhs->type().id != rhs->type().id)
+        {
+            std::cout << m_line_num << ": " << "Error! Type " << lhs->type().name() << " is not compatible with " << rhs->type().name() <<  "\n";
+        }
+        return lhs->type();
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "binop";
+        node["id"] = "binop";
         node["left"] = lhs->yaml();
         node["right"] = rhs->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        lhs->set_context(parent);
+        rhs->set_context(parent);
+    }
+
 };
 
 class Assignment : public Expression {
@@ -177,27 +347,52 @@ public:
     Identifier* lhs;
     Expression* rhs;
     Assignment(Identifier* lhs, Expression* rhs) :
-        lhs(lhs), rhs(rhs) { }
-    void print(int indent) const {
-        PRINT_ID("assign\n");
-        lhs->print(indent+1);
-        rhs->print(indent+1);
+        lhs(lhs), rhs(rhs)
+    {
+        add_child(lhs);
+        add_child(rhs);
     }
+
     void codeGen(CodeGenContext& context);
+
+    Type type() const
+    {
+        return lhs->type();
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "assign";
+        node["id"] = "assign";
         node["left"] = lhs->yaml();
         node["right"] = rhs->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        lhs->set_context(m_context);
+        rhs->set_context(m_context);
+    }
+
 };
 
 class Block : public Expression {
-public:
     StatementList statements;
-    Block() { }
+public:
+    Block()
+    {
+        for(auto it : statements)
+            add_child(it);
+    }
+
+    void add_statement(Statement *stmt)
+    {
+        statements.push_back(stmt);
+        add_child(stmt);
+    }
+
     void codeGen(CodeGenContext& context, int local_funcs_only);
     void print(int indent) const {
         PRINT_ID("block\n");
@@ -205,16 +400,30 @@ public:
             statements[i]->print(indent+1);
         }
     }
+
+    Type type() const
+    {
+        return Type::VOID;
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "block";
-
+        node["id"] = "block";
+        node["context"] = (size_t)m_context;
         YAML::Node stmnts = node["statements"];
         for(auto it : statements)
             stmnts.push_back(it->yaml());
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = new Context(parent);
+        for(auto it : statements)
+            it->set_context(m_context);
+    }
+
 };
 
 #if 0
@@ -229,19 +438,23 @@ public:
 
 class VariableDeclaration : public Statement {
 public:
-    const Typename* type;
-    Identifier* id;
-    Expression* assignmentExpr;
+    Typename* m_type;
+    Identifier* m_name;
+    Expression* m_assignment_expr;
     Value *v;
-    VariableDeclaration(const Typename* type, Identifier* id) :
-        type(type), id(id), v(0)
+    VariableDeclaration(Typename* type, Identifier* id) :
+        m_type(type), m_name(id), v(0)
     {
+        add_child(m_type);
+        add_child(m_name);
     }
 
-    VariableDeclaration(const Typename* type, Identifier* id, Expression *assignmentExpr) :
-        type(type), id(id), assignmentExpr(assignmentExpr), v(0)
+    VariableDeclaration(Typename* type, Identifier* id, Expression *assignmentExpr) :
+        m_type(type), m_name(id), m_assignment_expr(assignmentExpr), v(0)
     {
-
+        add_child(m_type);
+        add_child(m_name);
+        add_child(m_assignment_expr);
     }
 
     Value *value()
@@ -251,24 +464,39 @@ public:
         return v;
     }
 
+    Type type() const
+    {
+        m_context->m_locals[m_name->m_name] = m_type->type();
+        return Type::VOID;
+    }
+
     void print(int indent) const
     {
         PRINT_ID("variable declaration:\n");
-        id->print(indent + 1);
+        m_name->print(indent + 1);
         INDENT; printf(" = \n");
-        assignmentExpr->print(indent + 1);
+        m_assignment_expr->print(indent + 1);
 
     }
 
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "vardecl";
-        node["variable-type"] = type->yaml();
-        node["identifier"] = id->yaml();
-        if (assignmentExpr)
-            node["assign"] = assignmentExpr->yaml();
+        node["id"] = "vardecl";
+        node["variable-type"] = m_type->yaml();
+        node["identifier"] = m_name->yaml();
+        if (m_assignment_expr)
+            node["assign"] = m_assignment_expr->yaml();
         return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_type->set_context(m_context);
+        m_name->set_context(m_context);
+        if (m_assignment_expr)
+            m_assignment_expr->set_context(m_context);
     }
 
     void codeGen(CodeGenContext& context);
@@ -276,42 +504,60 @@ public:
 
 class FunctionDeclaration : public Statement {
 public:
-    const Typename* type;
-    const Identifier* id;
-    const VariableList* arguments;
-    Block* block;
-    FunctionDeclaration(const Typename* type,
-                        const Identifier* id,
-                        const VariableList* arguments,
+    Typename* m_type;
+    Identifier* m_id;
+    VariableList* m_arguments;
+    Block* m_block;
+    FunctionDeclaration(Typename* type,
+                        Identifier* id,
+                        VariableList* arguments,
                         Block* block) :
-        type(type), id(id), arguments(arguments), block(block)
-    {
-
+        m_type(type), m_id(id), m_arguments(arguments), m_block(block)
+    {  
+        add_child(m_type);
+        add_child(m_id);
+        add_child(m_block);
+        for(auto it : *m_arguments)
+            add_child(it);
     }
 
     void print(int indent) const {
         PRINT_ID("function declaration\n");
-        type->print(indent + 1);
-        id->print(indent + 1);
-        block->print(indent + 1);
+        m_type->print(indent + 1);
+        m_id->print(indent + 1);
+        m_block->print(indent + 1);
     }
 
     void codeGen(CodeGenContext& context);
 
+    Type type() const
+    {
+        return Type::VOID;
+    }
+
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "function";
-        node["name"] = id->yaml();
-        node["return-type"] = type->yaml();
+        node["id"] = "function";
+        node["name"] = m_id->yaml();
+        node["return-type"] = m_type->yaml();
         YAML::Node args = node["arguments"];
-        for(auto it : *arguments)
+        for(auto it : *m_arguments)
             args.push_back(it->yaml());
 
-        node["block"] = block->yaml();
+        node["block"] = m_block->yaml();
 
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_type->set_context(m_context);
+        m_id->set_context(m_context);
+        m_block->set_context(m_context);
+    }
+
 };
 
 #if 0
@@ -336,47 +582,78 @@ public:
 class IfStatement : public Statement
 {
 public:
-    Expression *evalExpr;
-    Block* thenBlock;
-    Block* elseBlock;
+    Expression *m_eval_expr;
+    Block* m_then_block;
+    Block* m_else_block;
 
     IfStatement(Expression *evalExpr, Block* thenBlock, Block *elseBlock) :
-        evalExpr(evalExpr), thenBlock(thenBlock), elseBlock(elseBlock)
+        m_eval_expr(evalExpr), m_then_block(thenBlock), m_else_block(elseBlock)
     {
+        add_child(m_eval_expr);
+        add_child(m_then_block);
+        if (m_else_block)
+            add_child(m_else_block);
+    }
+
+    Type type() const
+    {
+        return Type::VOID;
     }
 
     void codeGen(CodeGenContext& context);
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "if";
-        node["expr"] = evalExpr->yaml();
-        node["true-branch"] = thenBlock->yaml();
-        if (elseBlock)
-            node["false-branch"] = elseBlock->yaml();
+        node["id"] = "if";
+        node["expr"] = m_eval_expr->yaml();
+        node["true-branch"] = m_then_block->yaml();
+        if (m_else_block)
+            node["false-branch"] = m_else_block->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_eval_expr->set_context(parent);
+        m_then_block->set_context(parent);
+        if (m_else_block)
+            m_else_block->set_context(parent);
+    }
+
 };
 
 class ReturnStatement : public Statement
 {
 public:
     ReturnStatement(Expression *expr):
-        expr(expr)
+        m_expr(expr)
     {
+        add_child(m_expr);
+    }
 
+    Type type() const
+    {
+        return Type::VOID;
     }
 
     void codeGen(CodeGenContext &context);
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "return";
-        node["expr"] = expr->yaml();
+        node["id"] = "return";
+        node["expr"] = m_expr->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_expr->set_context(parent);
+    }
+
 private:
-    Expression *expr;
+    Expression *m_expr;
 };
 
 
@@ -384,52 +661,102 @@ class AssertStatement : public Statement
 {
 public:
     AssertStatement(Expression *expr):
-        expr(expr)
+        m_expr(expr)
     {
-
+        add_child(m_expr);
     }
 
     void print(int indent) const
     {
         PRINT_ID("assert\n");
-        expr->print(indent + 1);
+        m_expr->print(indent + 1);
+    }
+
+    Type type() const
+    {
+        return Type::VOID;
     }
 
     void codeGen(CodeGenContext &context);
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "assert";
-        node["expr"] = expr->yaml();
+        node["id"] = "assert";
+        node["expr"] = m_expr->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_expr->set_context(parent);
+    }
+
 private:
-    Expression *expr;
+    Expression *m_expr;
 };
 
 class PrintStatement : public Statement
 {
 public:
     PrintStatement(Expression *expr):
-        expr(expr)
+        m_expr(expr)
     {
+        add_child(m_expr);
+    }
 
+    Type type() const
+    {
+        return Type::VOID;
     }
 
     void print(int indent) const
     {
         PRINT_ID("print\n");
-        expr->print(indent + 1);
+        m_expr->print(indent + 1);
     }
     void codeGen(CodeGenContext &context);
     YAML::Node yaml() const
     {
         YAML::Node node;
-        node["type"] = "print";
-        node["expr"] = expr->yaml();
+        node["id"] = "print";
+        node["expr"] = m_expr->yaml();
         return node;
     }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
+        m_expr->set_context(parent);
+    }
+
 private:
-    Expression *expr;
+    Expression *m_expr;
 };
 
+class TypeVisitor : public Visitor
+{
+public:
+    void visit(Node* n)
+    {
+        n->type();
+    }
+};
+
+class PtrVisitor : public Visitor
+{
+public:
+    void visit(Node* n)
+    {
+        std::cout << n << std::endl;
+    }
+};
+
+class SetContextVisitor : public Visitor
+{
+public:
+    void visit(Node *)
+    {
+
+    }
+};

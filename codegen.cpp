@@ -22,7 +22,7 @@ void CodeGenContext::generate_code(Block& root)
 /* Executes the AST by running the main function */
 void CodeGenContext::run_code()
 {
-    if (debug) {
+    if (1) {
         dump();
         for(std::map<std::string , Value*>::const_iterator it = locals().begin(); it != locals().end(); it++) {
             std::cout << "Local " << it->first << " addr: " << it->second->addr << std::endl;
@@ -61,11 +61,11 @@ void String::codeGen(CodeGenContext &context)
 void Identifier::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Creating identifier reference: " << name << endl;
+        std::cout << "Creating identifier reference: " << m_name << endl;
 
-    Value *v = context.find_variable(name);
+    Value *v = context.find_variable(m_name);
     if (!v) {
-        std::cout << "Reference to unknown variable " << name << std::endl;
+        std::cout << "Reference to unknown variable " << m_name << std::endl;
         exit(0);
     }
     context.vpushm(v->addr);
@@ -74,17 +74,17 @@ void Identifier::codeGen(CodeGenContext& context)
 void MethodCall::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Calling function " << id->name << std::endl;
+        std::cout << "Calling function " << m_id->m_name << std::endl;
 
-    Function *f = context.find_function(id->name);
+    Function *f = context.find_function(m_id->m_name);
     if (!f) {
-        std::cout << "Error, no matching call to function " << id->name << std::endl;
+        std::cout << "Error, no matching call to function " << m_id->m_name << std::endl;
         exit(0);
     }
 
     ExpressionList::const_iterator it;
     int i = 0;
-    for (it = arguments->begin(); it != arguments->end(); it++) {
+    for (it = m_arguments->begin(); it != m_arguments->end(); it++) {
         (**it).codeGen(context);
         context.vpop(f->arguments[i++]);
     }
@@ -145,14 +145,14 @@ void BinaryOperator::codeGen(CodeGenContext& context)
 void Assignment::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Creating assignment for " << lhs->name << endl;
-    if (context.locals().find(lhs->name) == context.locals().end()) {
-        std::cerr << "undeclared variable " << lhs->name << endl;
+        std::cout << "Creating assignment for " << lhs->m_name << endl;
+    if (context.locals().find(lhs->m_name) == context.locals().end()) {
+        std::cerr << "undeclared variable " << lhs->m_name << endl;
         return;
     }
 
     rhs->codeGen(context);
-    context.vpop(context.locals()[lhs->name]->addr);
+    context.vpop(context.locals()[lhs->m_name]->addr);
 }
 
 
@@ -188,11 +188,11 @@ void ExpressionStatement::codeGen(CodeGenContext& context)
 void VariableDeclaration::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Creating variable declaration " << type->name << " " << id->name << endl;
+        std::cout << "Creating variable declaration " << m_type->m_name << " " << m_name->m_name << endl;
 
-    context.locals()[id->name] = value();
-    if (assignmentExpr != NULL) {
-        Assignment assn(id, assignmentExpr);
+    context.locals()[m_name->m_name] = value();
+    if (m_assignment_expr != NULL) {
+        Assignment assn(m_name, m_assignment_expr);
         assn.codeGen(context);
     }
 }
@@ -218,42 +218,42 @@ void FunctionDeclaration::codeGen(CodeGenContext& context)
 
     context.push_block(bblock);
     VariableList::const_iterator it;
-    for (it = arguments->begin(); it != arguments->end(); it++) {
+    for (it = m_arguments->begin(); it != m_arguments->end(); it++) {
         if (debug)
-            cout << "Argument : " << (**it).type->name ;
+            cout << "Argument : " << (**it).m_type->m_name ;
         Value *v = (*it)->value();
         (**it).codeGen(context);
         if (debug)
             cout << " at: " << v->addr << endl;
         f->arguments.push_back(v->addr);
     }
-    block->codeGen(context, true);
+    m_block->codeGen(context, true);
     f->pm_addr = context.getCurrent();
-    block->codeGen(context, false);
+    m_block->codeGen(context, false);
     context.vret();
     context.pop_block();
 
-    context.functions().insert(std::make_pair(id->name, f));
+    context.functions().insert(std::make_pair(m_id->m_name, f));
 
     if (debug)
-        std::cout << "Creating function: " << id->name << endl;
+        std::cout << "Creating function: " << m_id->m_name << endl;
 }
 
 void IfStatement::codeGen(CodeGenContext& context)
 {
     int then_end;
-    evalExpr->codeGen(context);
+    m_eval_expr->codeGen(context);
     int then_start = context.reserve();
-    thenBlock->codeGen(context, false);
+    m_then_block->codeGen(context, false);
 
-    if (elseBlock) {
+    if (m_else_block) {
         then_end = context.reserve();
-        elseBlock->codeGen(context ,false);
+        m_else_block->codeGen(context ,false);
     }
 
     int block_end = context.getCurrent();
 
-    if (elseBlock) {
+    if (m_else_block) {
         context.encode_at(then_end, CodeGenContext::JMP, CodeGenContext::A, block_end);
         context.encode_at(then_start, CodeGenContext::JNE, CodeGenContext::A, then_end);
     } else {
@@ -265,19 +265,19 @@ void IfStatement::codeGen(CodeGenContext& context)
 
 void ReturnStatement::codeGen(CodeGenContext &context)
 {
-    expr->codeGen(context);
+    m_expr->codeGen(context);
 }
 
 
 void AssertStatement::codeGen(CodeGenContext &context)
 {
-    expr->codeGen(context);
+    m_expr->codeGen(context);
     context.vassert();
 }
 
 void PrintStatement::codeGen(CodeGenContext &context)
 {
-    expr->codeGen(context);
+    m_expr->codeGen(context);
     context.vprint();
 }
 

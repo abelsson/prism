@@ -65,8 +65,8 @@
 program : stmts { programBlock = $1; }
         ;
 
-stmts : stmt { $$ = new Block(); $$->statements.push_back($<stmt>1); }
-      | stmts stmt { $1->statements.push_back($<stmt>2); }
+stmts : stmt { $$ = new Block(); $$->add_statement($<stmt>1); }
+      | stmts stmt { $1->add_statement($<stmt>2); }
       | stmts TNEWLINE {}
       | stmts error { yyclearin; yyerrok; }
       ;

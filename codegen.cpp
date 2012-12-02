@@ -105,29 +105,6 @@ void MethodCall::codeGen(CodeGenContext& context)
     context.vcall(idx);
 }
 
-void BinaryOperator::print(int indent) const {
-    PRINT_ID("binop: ");
-    switch (op) {
-    case TPLUS:
-        printf("+");
-        break;
-    case TMINUS:
-        break;
-    case TMUL:
-        printf("*");
-
-        break;
-    case TDIV:
-        break;
-    case TCEQ:
-        printf("==");
-        break;
-        /* TODO comparison */
-    }
-    printf("\n");
-    printf("%*s lhs:\n", indent, ""); lhs->print(indent+1);
-    printf("%*s rhs:\n", indent, ""); rhs->print(indent+1);
-}
 void BinaryOperator::codeGen(CodeGenContext& context)
 {
     if (debug)
@@ -302,6 +279,8 @@ void PrintStatement::codeGen(CodeGenContext &context)
     case Type::LIST:
         context.vprintl();
         break;
+    default:
+        context.vprint();
     }
 }
 

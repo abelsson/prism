@@ -91,12 +91,10 @@ protected:
 
 class Expression : public Node {
 public:
-    virtual void print(int indent) const { printf("node\n"); }
 };
 
 class Statement : public Node {
 public:
- virtual void print(int indent) const { printf("statement\n"); }
 };
 
 class Integer : public Expression {
@@ -156,7 +154,11 @@ public:
 class String : public Expression {
 public:
     std::string m_value;
-    String(const std::string* value) : m_value(*value) { }
+    String(const std::string* value) :
+        m_value(*value)
+    {
+        m_value = m_value.substr(1, m_value.length() - 2);
+    }
 
     Type type() const
     {
@@ -266,14 +268,19 @@ public:
 
     Type type() const
     {
-        std::cout << m_context->m_locals.size() << std::endl;
-        if (m_context->m_locals.count(m_name)) {
-            std::cout << " tpyw= " << m_name << " "  << m_context->m_locals[m_name].name() << std::endl;
-            return m_context->m_locals[m_name];
+        std::cout << "Locals: " << m_context->m_locals.size() << std::endl;
+
+        Context *ctx = m_context;
+        while (ctx) {
+            if (ctx->m_locals.count(m_name)) {
+                std::cout << " tpyw= " << m_name << " "  << ctx->m_locals[m_name].name() << std::endl;
+                return ctx->m_locals[m_name];
+            }
+            ctx = ctx->m_parent;
         }
-        else {
-            return Type::UNKNOWN;
-        }
+
+        return Type::UNKNOWN;
+
     }
 
     YAML::Node yaml() const
@@ -436,12 +443,6 @@ public:
     }
 
     void codeGen(CodeGenContext& context, int local_funcs_only);
-    void print(int indent) const {
-        PRINT_ID("block\n");
-        for(size_t i = 0; i < statements.size(); i++) {
-            statements[i]->print(indent+1);
-        }
-    }
 
     Type type() const
     {
@@ -512,15 +513,6 @@ public:
         return Type::VOID;
     }
 
-    void print(int indent) const
-    {
-        PRINT_ID("variable declaration:\n");
-        m_name->print(indent + 1);
-        INDENT; printf(" = \n");
-        m_assignment_expr->print(indent + 1);
-
-    }
-
     YAML::Node yaml() const
     {
         YAML::Node node;
@@ -563,18 +555,11 @@ public:
             add_child(it);
     }
 
-    void print(int indent) const {
-        PRINT_ID("function declaration\n");
-        m_type->print(indent + 1);
-        m_id->print(indent + 1);
-        m_block->print(indent + 1);
-    }
-
     void codeGen(CodeGenContext& context);
 
     Type type() const
     {
-        return Type::VOID;
+        return m_type->type();
     }
 
     YAML::Node yaml() const
@@ -708,11 +693,6 @@ public:
         add_child(m_expr);
     }
 
-    void print(int indent) const
-    {
-        PRINT_ID("assert\n");
-        m_expr->print(indent + 1);
-    }
 
     Type type() const
     {
@@ -752,11 +732,6 @@ public:
         return Type::VOID;
     }
 
-    void print(int indent) const
-    {
-        PRINT_ID("print\n");
-        m_expr->print(indent + 1);
-    }
     void codeGen(CodeGenContext &context);
     YAML::Node yaml() const
     {
@@ -795,7 +770,6 @@ public:
     {
         return Type::VOID;
     }
-
 
     void codeGen(CodeGenContext &context);
 

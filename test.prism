@@ -1,9 +1,14 @@
 func main = Int() {
-  List lst1 = [1,2,3,4];
+
+  func foo = String() {
+    return "foo";
+  }
+
+  List lst1 = ["hej", "sa", "jag"];
   List lst2 = [1,2];
 
-  foreach(Int y : lst1) {
-    print 10 + y;
+  foreach(String y : lst1) {
+    print y;
   }
 
 }

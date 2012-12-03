@@ -1,0 +1,17 @@
+
+func main = Int() {
+    Int width = [3,4];
+    Int height = [0,1];
+
+    Int inner = 0;
+    Int outer = 0;
+    foreach(Int y : height) {
+	outer = outer + 1;
+	foreach(Int x : width) {
+	    inner = inner + 1;
+	}
+
+    }
+    assert inner == 4;
+    assert outer == 2;
+}

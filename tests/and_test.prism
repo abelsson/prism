@@ -1,0 +1,9 @@
+func main = Int() {
+     Int a = 1;
+     Int b = 0;
+
+     assert a && a == 1;
+     assert a && b == 0;
+     assert b && a == 0;
+     assert b && b == 0;
+}

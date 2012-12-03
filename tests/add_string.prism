@@ -1,0 +1,10 @@
+func main = Int() {
+
+  String bar = "bar";
+  func foo = String() {
+    return "foo";
+  }
+
+  String res = foo() + bar + bar;
+  assert res == "foobarbar";
+}

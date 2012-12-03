@@ -25,8 +25,11 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <vector>
+
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_util.h"
+
+#include "type.h"
 #define NUM_OF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
 
 using namespace Xbyak;
@@ -46,19 +49,19 @@ struct IValue {
 class ToyVm : public Xbyak::CodeGenerator {
     typedef std::vector<uint32> Buffer;
 public:
-    enum Reg {
-        A, B
-    };
     enum Code {
-        LD, LDI, ST, ADD, MUL, CMP, SUB, SUBI, PUT, JNZ,
+        LD, LDI, ST, ADD, MUL, DIV, SUB,
+        AND,
+        CMP, CLT,
         PUSHI, PUSH, PUSHM, POP, POPM,
-        PUSHS,
+        PUSH_CONSTANT,
         MAKE_LIST, MAKE_ITER, LOOP_ITER, ITER_VALUE,
         CALL, RET,
-        ASSERT, PRINT, PRINTS, PRINTL,
+        ASSERT, PRINT,
         JE, JNE, JMP,
         END_OF_CODE
     };
+
     ToyVm()
          : m_mark(0)
     {
@@ -67,22 +70,22 @@ public:
 
     void vpush(uint16 imm)
     {
-        encode(PUSHI, A, imm);
+        encode(PUSHI, imm);
     }
 
-    void vpushs(uint16 imm)
+    void vpush_constant(uint16 imm)
     {
-        encode(PUSHS, A, imm);
+        encode(PUSH_CONSTANT, imm);
     }
 
     void vpushm(uint16 idx)
     {
-        encode(PUSHM, A, idx);
+        encode(PUSHM, idx);
     }
 
     void vcall(uint16 idx)
     {
-        encode(CALL, A, idx);
+        encode(CALL, idx);
     }
 
     void vret()
@@ -92,26 +95,12 @@ public:
 
     void vpop(uint16 idx)
     {
-        encode(POPM, A, idx);
-    }
-
-    void vldi(uint16 imm, Reg r)
-    {
-        encode(LDI, r, imm);
-    }
-
-    void vld(uint16 idx, Reg r)
-    {
-        encode(LD, r, idx);
-    }
-
-    void vst(Reg r, uint16 idx) {
-        encode(ST, r, idx);
+        encode(POPM, idx);
     }
 
     void vmake_list(int num)
     {
-        encode(MAKE_LIST, A, num);
+        encode(MAKE_LIST, num);
     }
 
     void vmake_iter()
@@ -121,7 +110,7 @@ public:
 
     void vloop_iter(int pc)
     {
-        encode(LOOP_ITER, A, pc);
+        encode(LOOP_ITER, pc);
     }
 
     void viter_value()
@@ -129,47 +118,32 @@ public:
         encode(ITER_VALUE);
     }
 
-    void vadd() {
-        encode(ADD);
+    void vadd(::Type t) {
+        encode(ADD, t);
     }
 
-    void vmul() {
-        encode(MUL);
+    void vmul(::Type t) {
+        encode(MUL, t);
     }
 
     void vassert() {
         encode(ASSERT);
     }
 
-    void vprint() {
-        encode(PRINT);
-    }
-
-    void vprints() {
-        encode(PRINTS);
-    }
-
-    void vprintl() {
-        encode(PRINTL);
-    }
-    void vjnz(Reg r, int offset) {
-        encode(JNZ, r, static_cast<uint16>(offset));
-    }
-
-    void vput(Reg r) {
-        encode(PUT, r);
+    void vprint(::Type t) {
+        encode(PRINT, t);
     }
 
     void vje(uint16 imm) {
-        encode(JE, A, imm);
+        encode(JE, imm);
     }
 
     void vjne(uint16 imm) {
-        encode(JNE, A, imm);
+        encode(JNE, imm);
     }
 
     void vjmp(uint16 imm) {
-        encode(JMP, A, imm);
+        encode(JMP,imm);
     }
 
     void set_label(const std::string& id) {
@@ -212,15 +186,28 @@ public:
         printf("]\n");
     }
 
-    void encode(Code code, Reg r = A, uint16 imm = 0)
+    void encode(Code code, uint16 imm)
     {
-        uint32 x = (code << 24) | (r << 16) | imm;
+        uint32 x = (code << 24) | (0 << 16) | imm;
         m_code.push_back(x);
     }
 
-    void encode_at(int idx, Code code, Reg r = A, uint16 imm = 0)
+    void encode(Code code, ::Type t = ::Type::UNKNOWN, uint16 imm = 0)
     {
-        uint32 x = (code << 24) | (r << 16) | imm;
+        uint32 x = (code << 24) | (t.id << 16) | imm;
+        m_code.push_back(x);
+    }
+
+
+    void encode_at(int idx, Code code, uint16 imm)
+    {
+        uint32 x = (code << 24) | (0 << 16) | imm;
+        m_code[idx] = x;
+    }
+
+    void encode_at(int idx, Code code, ::Type t = ::Type::UNKNOWN, uint16 imm = 0)
+    {
+        uint32 x = (code << 24) | (t.id << 16) | imm;
         m_code[idx] = x;
     }
 
@@ -231,6 +218,15 @@ public:
         value.str_value = str;
         m_constants.push_back(value);
         printf("Add string constant at %ld\n", m_constants.size() - 1);
+        return m_constants.size() - 1;
+    }
+
+    int add_constant(double d)
+    {
+        IValue value;
+        value.float_value = d;
+        m_constants.push_back(value);
+        printf("Add double constant at %ld\n", m_constants.size() - 1);
         return m_constants.size() - 1;
     }
 
@@ -246,10 +242,10 @@ private:
     int m_mark;
     std::map<std::string, int> m_labels;
 
-    void decode(uint32& code, uint32& r, uint32& imm, uint32 x)
+    void decode(uint32& code, int& t, uint32& imm, uint32 x)
     {
         code = x >> 24;
-        r = (x >> 16) & 0xff;
+        t = (x >> 16) & 0xff;
         imm = x & 0xffff;
 
     }

@@ -1,0 +1,14 @@
+func main = Int() {
+     Int a = 1;
+     Int b = 0;
+
+     assert b < a && a == 1;
+
+     Double x = 1.0;
+     Double y = 1.0;
+     Double iteration = 900;
+     print 1.0 * 1.0 + x*x < 4.0;
+     print (x*x + y*y) < 4.0;
+     print (x*x + y*y < 2.0*2.0) && (iteration < 1000);
+
+}

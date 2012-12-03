@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (prism)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -fno-operator-names")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wno-deprecated-declarations -fno-operator-names")
 
 set(SOURCES
   codegen.cpp
@@ -10,6 +10,7 @@ set(SOURCES
   ast.h
   main.cpp
   node.h
+  type.h
   tokens.l
   parser.y
   test.prism

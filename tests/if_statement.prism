@@ -1,0 +1,10 @@
+func main = Int() {
+    Int a = 5;
+    Int b = 7;
+    if (a == b) {
+	print "equal";
+    } else {
+	print "not equal";
+    }
+    print "hej";
+}

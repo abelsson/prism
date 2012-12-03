@@ -1,0 +1,35 @@
+func main = Int() {
+    Double y_iter = 0.0;
+    Double x_iter = 0.0;
+
+    print "P2\n";
+    print "#foo\n";
+    print "512 512\n";
+    print "100\n";
+   
+    while(y_iter < 512.0) {
+	while(x_iter < 512.0) {
+	    Double x0 = x_iter*(3.5/512.0)-2.5;
+	    Double y0 = y_iter*(2.0/512.0)-1.0;
+
+	    Double x = 0;
+	    Double y = 0;
+	    Double xtemp;
+
+	    Int iteration = 0;
+	    while ((x*x + y*y < 4.0) && (iteration < 100) )
+	    {
+		xtemp = x*x - y*y + x0;
+		y = 2.0*x*y + y0;
+		x = xtemp;
+		iteration = iteration + 1;
+	    }
+	    print iteration;
+	    print " ";
+	    x_iter = x_iter + 1.0;
+	}
+	x_iter = 0.0;
+	y_iter = y_iter + 1.0;
+	print "\n";
+    }
+}

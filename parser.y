@@ -38,8 +38,8 @@
 %token <string> TIDENTIFIER TTYPENAME TINTEGER TDOUBLE TSTRING
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TLBRACKET TRBRACKET TCOMMA TDOT TSEMICOLON TCOLON TNEWLINE
-%token <token> TPLUS TMINUS TMUL TDIV
-%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT TPRINT TFOREACH
+%token <token> TPLUS TMINUS TMUL TDIV TAND
+%token <token> TEXTERN TIF TELSE TRETURN TFUNC TASSERT TPRINT TFOREACH TWHILE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -53,10 +53,11 @@
 %type <varvec> func_decl_args
 %type <exprvec> call_args
 %type <block> program stmts block
-%type <stmt> stmt func_decl if_stmt return_stmt assert_stmt print_stmt foreach_stmt
+%type <stmt> stmt func_decl if_stmt return_stmt assert_stmt print_stmt foreach_stmt while_stmt
 %type <var_decl> var_decl
 %type <token> comparison
 /* Operator precedence for mathematical operators */
+%left TAND
 %left TCEQ TCNE TCLT TCLE TCGT TCGE
 %left TPLUS TMINUS
 %left TMUL TDIV
@@ -79,10 +80,11 @@ stmt : var_decl TSEMICOLON
 //     | extern_func_decl
      | if_stmt
      | foreach_stmt
+     | while_stmt
      | return_stmt TSEMICOLON
      | assert_stmt TSEMICOLON
      | print_stmt TSEMICOLON
-     // | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
+     | expr TSEMICOLON { $$ = new ExpressionStatement(*$1); }
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
@@ -108,6 +110,11 @@ return_stmt: TRETURN expr { $$ = new ReturnStatement($2); }
 
 foreach_stmt: TFOREACH TLPAREN var_decl TCOLON expr TRPAREN block { $$ = new ForeachStatement($3, $5, $7); }
          ;
+
+while_stmt: TWHILE TLPAREN expr TRPAREN block { $$ = new WhileStatement($3, $5); }
+         ;
+
+
 //extern_func_decl: TEXTERN ident ident TLPAREN func_decl_args TRPAREN TSEMICOLON { $$ = new ExternDeclaration($2, $3, $5); }
 //         ;
 
@@ -150,6 +157,7 @@ expr : ident TEQUAL expr { $$ = new Assignment($<ident>1, $3); }
      | ident { $<ident>$ = $1; }
      | literal
      | list_literal
+     | expr TAND expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr TPLUS expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr TMINUS expr { $$ = new BinaryOperator($1, $2, $3); }
      | expr TMUL expr { $$ = new BinaryOperator($1, $2, $3); }

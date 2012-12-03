@@ -51,13 +51,15 @@ void Double::codeGen(CodeGenContext& context)
 {
     if (debug)
         std::cout << "Creating double: " << m_value << endl;
+    int ref_id = context.add_constant(m_value);
+    context.vpush_constant(ref_id);
 }
 
 
 void String::codeGen(CodeGenContext &context)
 {
     int ref_id = context.add_constant(&m_value);
-    context.vpushs(ref_id);
+    context.vpush_constant(ref_id);
 }
 
 void ListLiteral::codeGen(CodeGenContext& context)
@@ -105,6 +107,19 @@ void MethodCall::codeGen(CodeGenContext& context)
     context.vcall(idx);
 }
 
+
+Type  BinaryOperator::type() const
+{
+    if (lhs->type().id != rhs->type().id)
+    {
+        std::cout << m_line_num << ": " << "Error! Type " << lhs->type().name() << " is not compatible with " << rhs->type().name() <<  "\n";
+    }
+
+    if (op == TCEQ || op == TCLT || op == TAND)
+        return Type::INT;
+
+    return lhs->type();
+}
 void BinaryOperator::codeGen(CodeGenContext& context)
 {
     if (debug)
@@ -115,17 +130,25 @@ void BinaryOperator::codeGen(CodeGenContext& context)
 
     switch (op) {
     case TPLUS:
-        context.vadd();
+        context.vadd(type());
         break;
     case TMINUS:
+        context.encode(ToyVm::SUB, type());
+        break;
+    case TAND:
+        context.encode(ToyVm::AND, type());
         break;
     case TMUL:
-        context.vmul();
+        context.vmul(type());
         break;
     case TDIV:
+        context.encode(ToyVm::DIV, type());
         break;
     case TCEQ:
-        context.encode(ToyVm::CMP);
+        context.encode(ToyVm::CMP, lhs->type());
+        break;
+    case TCLT:
+        context.encode(ToyVm::CLT, lhs->type());
         break;
         /* TODO comparison */
     }
@@ -165,14 +188,12 @@ void Block::codeGen(CodeGenContext& context, int local_funcs_only)
         std::cout << "Creating block" << endl;
 }
 
-#if 0
 void ExpressionStatement::codeGen(CodeGenContext& context)
 {
     if (debug)
-        std::cout << "Generating code for " << typeid(expression).name() << endl;
-    return expression.codeGen(context);
+        std::cout << "Generating code for " << typeid(m_expression).name() << endl;
+    return m_expression.codeGen(context);
 }
-#endif
 
 void VariableDeclaration::codeGen(CodeGenContext& context)
 {
@@ -243,10 +264,10 @@ void IfStatement::codeGen(CodeGenContext& context)
     int block_end = context.getCurrent();
 
     if (m_else_block) {
-        context.encode_at(then_end, CodeGenContext::JMP, CodeGenContext::A, block_end);
-        context.encode_at(then_start, CodeGenContext::JNE, CodeGenContext::A, then_end);
+        context.encode_at(then_end, CodeGenContext::JMP, block_end);
+        context.encode_at(then_start, CodeGenContext::JNE, then_end);
     } else {
-        context.encode_at(then_start, CodeGenContext::JNE, CodeGenContext::A, block_end);
+        context.encode_at(then_start, CodeGenContext::JNE, block_end);
     }
 }
 
@@ -268,20 +289,7 @@ void PrintStatement::codeGen(CodeGenContext &context)
 {
     m_expr->codeGen(context);
 
-    switch(m_expr->type().id)
-    {
-    case Type::INT:
-        context.vprint();
-        break;
-    case Type::STRING:
-        context.vprints();
-        break;
-    case Type::LIST:
-        context.vprintl();
-        break;
-    default:
-        context.vprint();
-    }
+    context.vprint(m_expr->type());
 }
 
 
@@ -295,4 +303,17 @@ void ForeachStatement::codeGen(CodeGenContext &context)
     context.vpop(context.locals()[m_var_decl->m_name->m_name]->addr);
     m_block->codeGen(context, false);
     context.vloop_iter(pos);
+    context.vpop(444);
+    context.vpop(444);
+}
+
+
+void WhileStatement::codeGen(CodeGenContext &context)
+{
+    int start = context.getCurrent();
+    m_block->codeGen(context, false);
+    m_expr->codeGen(context);
+
+    context.encode(CodeGenContext::JE, start);
+
 }

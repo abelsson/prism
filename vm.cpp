@@ -3,6 +3,23 @@
 
 extern int debug;
 
+std::string replace_all(const std::string &str, const std::string &search_val, const std::string &replace_val)
+{
+    size_t start = 0;
+    std::string result = str;
+    while(1) {
+        size_t where = result.find(search_val, start);
+        if(where == std::string::npos) {
+            break;
+        }
+        result.replace(where, search_val.size(), replace_val);
+        start = where + replace_val.size();
+    }
+    return result;
+}
+
+
+
 void ToyVm::setMark()
 {
     m_mark = (int)m_code.size();
@@ -29,18 +46,54 @@ void ToyVm::run(int start_pc)
     for (;;) {
         uint32 x = m_code[pc];
         uint32 code, r, imm;
-        decode(code, r, imm, x);
+        ::Type t;
+        decode(code, t.id, imm, x);
         switch (code) {
         case ADD: {
-            int a = m_mem[++sp].int_value;
-            int b = m_mem[++sp].int_value;
-            m_mem[sp--].int_value = a + b;
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = a + b;
+            } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].float_value = a + b;
+            } break;
+            case ::Type::STRING: {
+                const std::string* a = m_mem[++sp].str_value;
+                const std::string* b = m_mem[++sp].str_value;
+                m_mem[sp--].str_value = new std::string(*b + *a);
+            } break;
+            default:
+                assert(false);
+            }
+            } break;
+
+        case SUB: {
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = b - a;
+            } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].float_value = b - a;
+            } break;
+            default:
+                assert(false);
+            }
+            } break;
+        case ::Type::STRING: {
             } break;
         case PUSHI:
             m_mem[sp--].int_value = imm;
             break;
-        case PUSHS:
-            m_mem[sp--].str_value = m_constants[imm].str_value;
+        case PUSH_CONSTANT:
+            m_mem[sp--] = m_constants[imm];
             break;
         case PUSHM:
             m_mem[sp--] = m_mem[imm];
@@ -49,30 +102,99 @@ void ToyVm::run(int start_pc)
             m_mem[imm] = m_mem[++sp];
             break;
         case MUL: {
-            int a = m_mem[++sp].int_value;
-            int b = m_mem[++sp].int_value;
-            m_mem[sp--].int_value = a * b;
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = a * b;
+                } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].float_value = a * b;
+                } break;
+            default:
+                assert(false);
+            }
+            } break;
+        case AND: {
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = a && b;
+                } break;
+            default:
+                assert(false);
+            }
+            } break;
+        case DIV: {
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = b / a;
+                } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].float_value = b / a;
+                } break;
+            default:
+                assert(false);
+            }
             } break;
         case CMP: {
-            int a = m_mem[++sp].int_value;
-            int b = m_mem[++sp].int_value;
-            m_mem[sp--].int_value = a == b;
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = a == b;
+                } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].int_value = a == b;
+                } break;
+            case ::Type::STRING: {
+                const std::string* a = m_mem[++sp].str_value;
+                const std::string* b = m_mem[++sp].str_value;
+                m_mem[sp--].int_value = *a == *b;
+                } break;
+            default:
+                assert(false);
             }
-            break;
+            } break;
+        case CLT: {
+            switch (t.id) {
+            case ::Type::INT: {
+                int a = m_mem[++sp].int_value;
+                int b = m_mem[++sp].int_value;
+                m_mem[sp--].int_value = b < a;
+                } break;
+            case ::Type::DOUBLE: {
+                double a = m_mem[++sp].float_value;
+                double b = m_mem[++sp].float_value;
+                m_mem[sp--].int_value = b < a;
+                } break;
+            default:
+                assert(false);
+            }
+            } break;
         case JE: {
             int val =  m_mem[++sp].int_value;
             if (val == 1)
-                pc = imm;
+                pc = imm - 1;
             }
             break;
         case JNE: {
             int val =  m_mem[++sp].int_value;
             if (val == 0)
-                pc = imm;
+                pc = imm - 1;
             }
             break;
         case JMP:
-            pc = imm;
+            pc = imm - 1;
             break;
         case CALL:
             m_callstack[call_sp++] = pc;
@@ -89,18 +211,25 @@ void ToyVm::run(int start_pc)
             assert(val != 0);
             } break;
         case PRINT: {
-            int val =  m_mem[++sp].int_value;
-            printf("%d\n", val);
-            } break;
-        case PRINTS: {
-            std::string val =  *m_mem[++sp].str_value;
-            printf("%s\n", val.c_str());
-            } break;
-        case PRINTL: {
-            std::list<IValue>* val =  m_mem[++sp].list_value;
-            for(auto it : *val)
-                printf("%d, ", it.int_value);
-            printf("\n");
+            switch (t.id) {
+            case ::Type::INT:
+                printf("%d", m_mem[++sp].int_value);
+                break;
+            case ::Type::STRING:
+                printf("%s", replace_all(*m_mem[++sp].str_value,"\\n","\n").c_str());
+                break;
+            case ::Type::DOUBLE:
+                printf("%f", m_mem[++sp].float_value);
+                break;
+            case ::Type::LIST: {
+                std::list<IValue>* val =  m_mem[++sp].list_value;
+                for(auto it : *val)
+                    printf("%d, ", it.int_value);
+                printf("");
+                } break;
+            default:
+                assert(false);
+            }
             } break;
         case MAKE_ITER:
             m_mem[sp].list_iter = new std::list<IValue>::iterator();
@@ -154,8 +283,9 @@ void ToyVm::dump()
     const size_t end = m_code.size();
     for (int i=0;i<end;i++) {
         uint32 x = m_code[i];
-        uint32 code, r, imm;
-        decode(code, r, imm, x);
+        ::Type t;
+        uint32 code, imm;
+        decode(code, t.id, imm, x);
         printf("%02d: ", i);
         print_code(code, imm);
         printf("\n");
@@ -168,8 +298,8 @@ void ToyVm::print_code(int code, int imm)
     case PUSHI:
         printf("push %d", imm);
         break;
-    case PUSHS:
-        printf("pushs %d", imm);
+    case PUSH_CONSTANT:
+        printf("push-constant %d", imm);
         break;
     case PUSHM:
         printf("push [%d]", imm);
@@ -186,23 +316,29 @@ void ToyVm::print_code(int code, int imm)
     case ADD:
         printf("add");
         break;
+    case SUB:
+        printf("add");
+        break;
     case MUL:
         printf("mul");
         break;
+    case DIV:
+        printf("div");
+        break;
+    case AND:
+        printf("and");
+        break;
     case CMP:
         printf("cmp");
+        break;
+    case CLT:
+        printf("clt");
         break;
     case ASSERT:
         printf("assert");
         break;
     case PRINT:
         printf("print");
-        break;
-    case PRINTS:
-        printf("prints");
-        break;
-    case PRINTL:
-        printf("printl");
         break;
     case JE:
         printf("je %d", imm);
@@ -263,8 +399,9 @@ void ToyVm::recompile()
     uint32 labelNum = 0;
     for (;;) {
         uint32 x = m_code[pc];
-        uint32 code, r, imm;
-        decode(code, r, imm, x);
+        ::Type t;
+        uint32 code, imm;
+        decode(code, t.id, imm, x);
         L(Label::toStr(labelNum++).c_str());
         switch (code) {
         case PUSHI:

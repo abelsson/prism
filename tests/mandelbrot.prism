@@ -1,0 +1,28 @@
+func calc_pixel = Int(Int y, Int x) {
+    Double x0 = x*3.5/32-2.5;
+    Double y0 = y*3.5/32-2.5;
+
+    Int iteration = 0;
+
+    while ( x*x + y*y < 2.0*2.0  && iteration < max_iteration )
+    {
+	Double xtemp = x*x - y*y + x0;
+	Double y = 2.0*x*y + y0;
+	Double x = xtemp;
+	iteration = iteration + 1;
+    }
+    
+    return iteration;
+};
+
+func main = Int() {
+    Int width = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
+    Int height = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
+
+    foreach(Int y : range(0, width)) {
+	foreach(Int x : range(0, width)) {
+	    print calc_pixel(y, x);
+	}
+	
+    }
+}

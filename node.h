@@ -28,28 +28,6 @@ class Visitor
     virtual void visit(Node*) = 0;
 };
 
-class Type
-{
-public:
-    enum { INT, DOUBLE, STRING, LIST, UNKNOWN, VOID };
-    Type() { id = UNKNOWN; }
-    Type(int id): id(id) {}
-    int id;
-
-    std::string name()
-    {
-        switch(id)
-        {
-        case INT: return "Int";
-        case DOUBLE: return "Double";
-        case STRING: return "String";
-        case VOID: return "Void";
-        case UNKNOWN:
-        default: return "unknown";
-        }
-    }
-};
-
 class Context;
 
 class Context
@@ -58,6 +36,7 @@ public:
     Context(Context* parent): m_parent(parent) {}
 
     std::map<std::string , Type> m_locals;
+    std::map<std::string , Type> m_functions;
     Context* m_parent;
 };
 
@@ -98,7 +77,7 @@ public:
 };
 
 class Integer : public Expression {
-public:    
+public:
     long long m_value;
 
     Value *value() { return new Value(m_value); }
@@ -126,7 +105,7 @@ public:
 };
 
 class Double : public Expression {
-public:    
+public:
     double m_value;
     Double(double value) : m_value(value) { }
 
@@ -273,7 +252,7 @@ public:
         Context *ctx = m_context;
         while (ctx) {
             if (ctx->m_locals.count(m_name)) {
-                std::cout << " tpyw= " << m_name << " "  << ctx->m_locals[m_name].name() << std::endl;
+                std::cout << " type= " << m_name << " "  << ctx->m_locals[m_name].name() << std::endl;
                 return ctx->m_locals[m_name];
             }
             ctx = ctx->m_parent;
@@ -323,6 +302,18 @@ public:
 
     Type type() const
     {
+        std::string name = m_id->m_name;
+        std::cout << "Locals: " << m_context->m_functions.size() << std::endl;
+
+        Context *ctx = m_context;
+        while (ctx) {
+            if (ctx->m_functions.count(name)) {
+                std::cout << " type= " << name << " "  << ctx->m_functions[name].name() << std::endl;
+                return ctx->m_functions[name];
+            }
+            ctx = ctx->m_parent;
+        }
+
         return Type::UNKNOWN;
     }
 
@@ -364,14 +355,7 @@ public:
     void print(int indent) const;
     void codeGen(CodeGenContext& context);
 
-    Type type() const
-    {
-        if (lhs->type().id != rhs->type().id)
-        {
-            std::cout << m_line_num << ": " << "Error! Type " << lhs->type().name() << " is not compatible with " << rhs->type().name() <<  "\n";
-        }
-        return lhs->type();
-    }
+    Type type() const;
 
     YAML::Node yaml() const
     {
@@ -469,15 +453,34 @@ public:
 
 };
 
-#if 0
 class ExpressionStatement : public Statement {
 public:
-    Expression& expression;
+    Expression& m_expression;
     ExpressionStatement(Expression& expression) :
-        expression(expression) { }
+        m_expression(expression) { }
+
+    Type type() const
+    {
+        return m_expression.type();
+    }
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["id"] = "expression";
+        node["expression"] = m_expression.yaml();
+        return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = new Context(parent);
+        m_expression.set_context(parent);
+    }
+
     void codeGen(CodeGenContext& context);
 };
-#endif
+
 
 class VariableDeclaration : public Statement {
 public:
@@ -547,7 +550,7 @@ public:
                         VariableList* arguments,
                         Block* block) :
         m_type(type), m_id(id), m_arguments(arguments), m_block(block)
-    {  
+    {
         add_child(m_type);
         add_child(m_id);
         add_child(m_block);
@@ -559,6 +562,7 @@ public:
 
     Type type() const
     {
+        m_context->m_functions[m_id->m_name] = m_type->type();
         return m_type->type();
     }
 
@@ -583,6 +587,8 @@ public:
         m_type->set_context(m_context);
         m_id->set_context(m_context);
         m_block->set_context(m_context);
+        for(auto it : *m_arguments)
+            it->set_context(m_context);
     }
 
 };
@@ -787,6 +793,42 @@ public:
     {
         m_context = parent;
         m_var_decl->set_context(parent);
+        m_expr->set_context(parent);
+        m_block->set_context(parent);
+    }
+};
+
+class WhileStatement : public Statement
+{
+    Expression *m_expr;
+    Block *m_block;
+public:
+    WhileStatement(Expression *expr, Block *block):
+       m_expr(expr), m_block(block)
+    {
+        add_child(m_expr);
+        add_child(m_block);
+    }
+
+    Type type() const
+    {
+        return Type::VOID;
+    }
+
+    void codeGen(CodeGenContext &context);
+
+    YAML::Node yaml() const
+    {
+        YAML::Node node;
+        node["id"] = "foreach";
+        node["iter"] = m_expr->yaml();
+        node["block"] = m_block->yaml();
+        return node;
+    }
+
+    void set_context(Context* parent)
+    {
+        m_context = parent;
         m_expr->set_context(parent);
         m_block->set_context(parent);
     }

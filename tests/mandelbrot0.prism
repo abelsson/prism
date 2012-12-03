@@ -12,8 +12,8 @@ func main = Int() {
 	    Double x0 = x_iter*(3.5/512.0)-2.5;
 	    Double y0 = y_iter*(2.0/512.0)-1.0;
 
-	    Double x = 0;
-	    Double y = 0;
+	    Double x = 0.0;
+	    Double y = 0.0;
 	    Double xtemp;
 
 	    Int iteration = 0;

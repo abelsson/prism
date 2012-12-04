@@ -4,13 +4,11 @@
 #include "parser.hpp"
 #define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t) (yylval.token = t)
-extern "C" int yywrap() { }
-int check_type();
+extern "C" int yywrap() { return 1; }
 extern int line_num;
 %}
 
 %%
-
 [ \t]                   ;
 \n                      line_num++;
 [0-9]+\.[0-9]*          SAVE_TOKEN; return TDOUBLE;
@@ -53,15 +51,3 @@ L?'(\\.|[^\\'])*'       SAVE_TOKEN; return TSTRING;
 .                       printf("Unknown token!\n"); yyterminate();
 
 %%
-
-int check_type()
-{
-    std::string token =  std::string(yytext, yyleng);
-
-    if (token == "int" ||
-        token == "double" ||
-        token == "string")
-        return TTYPENAME;
-
-    return(TIDENTIFIER);
-}
